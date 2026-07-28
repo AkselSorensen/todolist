@@ -354,25 +354,26 @@ onUnmounted(() => ctx?.revert())
               </div>
               <div class="flex items-center gap-2">
                 <input type="checkbox" name="all_day" id="all_day_evt" :checked="editingEvent?.all_day" class="rounded" />
-                <label for="all_day_evt" class="text-sm text-text-muted">Toute la journée</label>
+                <label for="all_day_evt" class="text-sm text-text-muted cursor-pointer">Toute la journée</label>
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-sm font-medium text-text-muted mb-1">
-                    {{ selectedEndDate ? 'Du' : 'Date' }} *
-                  </label>
-                  <input type="date" name="start_date" required :value="editingEvent?.start_time?.split('T')[0] || selectedDate"
-                    class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+                  <label class="block text-sm font-medium text-text-muted mb-1">Du *</label>
+                  <input type="date" name="start_date" required :value="editingEvent?.start_time?.split('T')[0] || selectedDate || toDateStr(new Date())"
+                    class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-text-muted mb-1">{{ selectedEndDate ? 'Au' : 'Heure' }}</label>
-                  <input v-if="selectedEndDate || editingEvent?.end_time?.split('T')[0] !== editingEvent?.start_time?.split('T')[0]" type="date" name="end_date"
-                    :value="editingEvent?.end_time?.split('T')[0] || selectedEndDate"
-                    class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
-                  <input v-else type="time" name="start_time"
-                    :value="editingEvent?.start_time?.split('T')[1]?.slice(0, 5) || ''"
-                    class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+                  <label class="block text-sm font-medium text-text-muted mb-1">Au</label>
+                  <input type="date" name="end_date"
+                    :value="editingEvent?.end_time?.split('T')[0] || selectedEndDate || editingEvent?.start_time?.split('T')[0] || selectedDate || toDateStr(new Date())"
+                    class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors" />
                 </div>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-text-muted mb-1">Heure (optionnel)</label>
+                <input type="time" name="start_time"
+                  :value="editingEvent?.start_time?.split('T')[1]?.slice(0, 5) || ''"
+                  class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-text-muted mb-1">Lieu</label>
