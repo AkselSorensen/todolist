@@ -57,15 +57,10 @@ onMounted(async () => {
     markersLayer = L.layerGroup().addTo(mapInstance)
 
     if (geoJsonData) {
-      const visitedNames = allPlaces.value.filter((p: any) => isVisited(p.name)).map((p: any) => p.en)
       geoJsonLayer = L.geoJSON(geoJsonData, {
-        style: (feature: any) => {
-          const name = feature?.properties?.name
-          return visitedNames.includes(name)
-            ? { fillColor: '#F5A623', fillOpacity: 0.35, color: '#F5A623', weight: 1.5, opacity: 0.8 }
-            : { fillOpacity: 0, color: 'transparent', weight: 0 }
-        },
+        style: { fillOpacity: 0, color: 'transparent', weight: 0 },
       }).addTo(mapInstance)
+      updateGeoJSON()
     }
 
     updateMarkers()
