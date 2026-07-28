@@ -206,7 +206,7 @@ function flyToPlace(p: any) {
 </template>
 
 <style>
-.leaflet-container { width: 100% !important; height: 100% !important; background: #1a1a24; z-index: 1; }
+.leaflet-container { background: #1a1a24; z-index: 1; }
 .leaflet-popup-content-wrapper { background: #1a1a24 !important; color: #e8e8f0 !important; border: 1px solid #2a2a3e !important; border-radius: 12px !important; }
 .leaflet-popup-tip { background: #1a1a24 !important; }
 </style>
