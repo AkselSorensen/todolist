@@ -26,7 +26,7 @@ const allPlaces = [
   { name: 'Islande', en: 'Iceland', lat: 65.0, lng: -19.0, continent: 'Europe', emoji: '🇮🇸' },
   { name: 'Irlande', en: 'Ireland', lat: 53.4, lng: -8.2, continent: 'Europe', emoji: '🇮🇪' },
   { name: 'Pologne', en: 'Poland', lat: 51.9, lng: 19.1, continent: 'Europe', emoji: '🇵🇱' },
-  { name: 'Rép. Tchèque', en: 'Czech Republic', lat: 49.8, lng: 15.5, continent: 'Europe', emoji: '🇨🇿' },
+  { name: 'Rép. Tchèque', en: 'Czechia', lat: 49.8, lng: 15.5, continent: 'Europe', emoji: '🇨🇿' },
   { name: 'Hongrie', en: 'Hungary', lat: 47.2, lng: 19.5, continent: 'Europe', emoji: '🇭🇺' },
   { name: 'Roumanie', en: 'Romania', lat: 45.9, lng: 25.0, continent: 'Europe', emoji: '🇷🇴' },
   { name: 'Croatie', en: 'Croatia', lat: 45.1, lng: 15.2, continent: 'Europe', emoji: '🇭🇷' },
@@ -64,7 +64,7 @@ const allPlaces = [
   { name: 'Égypte', en: 'Egypt', lat: 26.8, lng: 30.8, continent: 'Afrique', emoji: '🇪🇬' },
   { name: 'Afrique du Sud', en: 'South Africa', lat: -30.6, lng: 22.9, continent: 'Afrique', emoji: '🇿🇦' },
   { name: 'Kenya', en: 'Kenya', lat: -0.02, lng: 37.9, continent: 'Afrique', emoji: '🇰🇪' },
-  { name: 'Tanzanie', en: 'Tanzania', lat: -6.4, lng: 34.9, continent: 'Afrique', emoji: '🇹🇿' },
+  { name: 'Tanzanie', en: 'United Republic of Tanzania', lat: -6.4, lng: 34.9, continent: 'Afrique', emoji: '🇹🇿' },
   { name: 'Sénégal', en: 'Senegal', lat: 14.5, lng: -14.5, continent: 'Afrique', emoji: '🇸🇳' },
   { name: 'Tunisie', en: 'Tunisia', lat: 33.9, lng: 9.5, continent: 'Afrique', emoji: '🇹🇳' },
   { name: 'Madagascar', en: 'Madagascar', lat: -18.8, lng: 46.9, continent: 'Afrique', emoji: '🇲🇬' },
@@ -116,7 +116,7 @@ onMounted(async () => {
 
   // Load GeoJSON country boundaries
   try {
-    const resp = await fetch('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geojson')
+    const resp = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
     geoJsonData = await resp.json()
   } catch { /* map will work without country fill */ }
 
