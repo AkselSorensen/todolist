@@ -1,0 +1,45 @@
+import { query } from '../../utils/db'
+
+// GET all todos
+export default defineEventHandler(async (e) => {
+  const method = e.method
+  
+  if (method === 'GET') {
+    const { category, status, assigned } = getQuery(e)
+    let sql = `
+      SELECT t.*, 
+        tc.name as category_name, tc.icon as category_icon, tc.color as category_color,
+        u_creator.name as creator_name, u_creator.color as creator_color,
+        u_assign.name as assignee_name, u_assign.color as assignee_color
+      FROM todos t
+      LEFT JOIN todo_categories tc ON t.category_id = tc.id
+      LEFT JOIN users u_creator ON t.created_by = u_creator.id
+      LEFT JOIN users u_assign ON t.assigned_to = u_assign.id
+      WHERE 1=1
+    `
+    const params: any[] = []
+    let i = 1
+    
+    if (category) { sql += ` AND tc.name = $${i++}`; params.push(category) }
+    if (status) { sql += ` AND t.status = $${i++}`; params.push(status) }
+    if (assigned) { sql += ` AND u_assign.name = $${i++}`; params.push(assigned) }
+    
+    sql += ' ORDER BY t.priority DESC, t.created_at DESC'
+    
+    const result = await query(sql, params)
+    return result.rows
+  }
+
+  // POST create todo
+  if (method === 'POST') {
+    const body = await readBody(e)
+    const { title, description, category_id, created_by, assigned_to, priority, status } = body
+    
+    const result = await query(
+      `INSERT INTO todos (title, description, category_id, created_by, assigned_to, priority, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [title, description || '', category_id || null, created_by || 1, assigned_to || null, priority || 'medium', status || 'todo']
+    )
+    return result.rows[0]
+  }
+})
