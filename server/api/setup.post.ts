@@ -45,7 +45,7 @@ export default defineEventHandler(async () => {
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       description TEXT DEFAULT '',
-      event_type TEXT NOT NULL DEFAULT 'event' CHECK (event_type IN ('event', 'availability', 'reminder', 'date_night')),
+      event_type TEXT NOT NULL DEFAULT 'event' CHECK (event_type IN ('event', 'availability', 'reminder', 'date_night', 'trip')),
       start_time TIMESTAMPTZ NOT NULL,
       end_time TIMESTAMPTZ,
       all_day BOOLEAN DEFAULT false,
@@ -56,6 +56,10 @@ export default defineEventHandler(async () => {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `)
+
+  // Fix event_type constraint for existing DBs (add 'trip')
+  await query(`ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_event_type_check`)
+  await query(`ALTER TABLE calendar_events ADD CONSTRAINT calendar_events_event_type_check CHECK (event_type IN ('event', 'availability', 'reminder', 'date_night', 'trip'))`)
 
   // Seed default data
   const existingUsers = await query('SELECT COUNT(*) as c FROM users')
