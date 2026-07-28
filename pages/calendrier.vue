@@ -128,13 +128,13 @@ onUnmounted(() => ctx?.revert())
 <template>
   <div class="max-w-6xl mx-auto px-4 py-8">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
       <div>
-        <h1 class="text-3xl font-bold flex items-center gap-3">
-          <Icon icon="lucide:calendar-days" class="w-7 h-7 text-lavender" />
+        <h1 class="text-2xl sm:text-3xl font-bold flex items-center gap-3">
+          <Icon icon="lucide:calendar-days" class="w-6 sm:w-7 h-6 sm:h-7 text-lavender" />
           Calendrier
         </h1>
-        <p class="text-text-muted text-sm mt-1">Nos disponibilités, sorties et rappels</p>
+        <p class="text-text-muted text-xs sm:text-sm mt-1">Nos disponibilités, sorties et rappels</p>
       </div>
       <button @click="showModal = true; editingEvent = null; selectedDate = toDateStr(new Date())"
         class="px-5 py-2.5 bg-gradient-to-r from-lavender to-rose rounded-xl text-white font-semibold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-lavender/20 flex items-center gap-2">
@@ -160,14 +160,14 @@ onUnmounted(() => ctx?.revert())
       </div>
       <div class="grid grid-cols-7">
         <div v-for="(day, i) in calendarDays" :key="i" @dblclick="openCreateForDay(day.date)"
-          class="cal-day min-h-[90px] p-2 border-b border-r border-border/50 cursor-pointer hover:bg-surface2/50 transition-colors relative"
+          class="cal-day min-h-[60px] sm:min-h-[90px] p-1 sm:p-2 border-b border-r border-border/50 cursor-pointer hover:bg-surface2/50 transition-colors relative"
           :class="{ 'opacity-30': !day.isCurrentMonth, 'bg-lavender/5': day.isToday }">
-          <div class="flex items-center justify-between mb-1">
-            <span class="text-xs font-medium" :class="day.isToday ? 'bg-lavender text-white w-6 h-6 rounded-full flex items-center justify-center' : 'text-text-muted'">
+          <div class="flex items-center justify-between mb-0.5 sm:mb-1">
+            <span class="text-[10px] sm:text-xs font-medium" :class="day.isToday ? 'bg-lavender text-white w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center' : 'text-text-muted'">
               {{ day.date.getDate() }}
             </span>
           </div>
-          <div class="space-y-0.5">
+          <div class="space-y-0.5 hidden sm:block">
             <div v-for="evt in getEventsForDay(day.date).slice(0, 3)" :key="evt.id" @click.stop="openEditEvent(evt)"
               class="text-[10px] px-1.5 py-0.5 rounded-md truncate cursor-pointer hover:brightness-110 transition-all flex items-center gap-1"
               :style="{ background: (evt.color || '#a78bfa') + '20', color: evt.color || '#a78bfa' }" :title="evt.title">
@@ -177,6 +177,11 @@ onUnmounted(() => ctx?.revert())
             <div v-if="getEventsForDay(day.date).length > 3" class="text-[10px] text-text-muted px-1.5">
               +{{ getEventsForDay(day.date).length - 3 }}
             </div>
+          </div>
+          <!-- Mobile dot indicator -->
+          <div v-if="getEventsForDay(day.date).length > 0" class="sm:hidden flex justify-center gap-0.5 mt-0.5">
+            <div v-for="(evt, ei) in getEventsForDay(day.date).slice(0, 3)" :key="ei"
+              class="w-1.5 h-1.5 rounded-full" :style="{ background: evt.color || '#a78bfa' }" />
           </div>
         </div>
       </div>
