@@ -115,12 +115,15 @@ const mapContainer = ref<HTMLElement | null>(null)
 let mapInstance: any = null
 let markersLayer: any = null
 
+let LeafletModule: any = null
+
 onMounted(async () => {
   await loadVisited()
   await nextTick()
   await new Promise(r => setTimeout(r, 200))
   
-  const L = (await import('leaflet')).default
+  LeafletModule = await import('leaflet')
+  const L = LeafletModule.default
   
   if (mapContainer.value) {
     mapInstance = L.map(mapContainer.value, { center: [25, 0], zoom: 2, zoomControl: true, attributionControl: false, scrollWheelZoom: true })
@@ -133,24 +136,23 @@ onMounted(async () => {
 })
 
 function updateMarkers() {
-  if (!markersLayer || !mapInstance) return
+  if (!markersLayer || !mapInstance || !LeafletModule) return
+  const Leaflet = LeafletModule.default
   markersLayer.clearLayers()
-  const L = (window as any).L || mapInstance._leaflet
   
-  // Need to re-import or use the L reference
-  import('leaflet').then(({ default: Leaflet }) => {
-    markersLayer.clearLayers()
-    filteredPlaces.value.forEach(p => {
-      const visitedIcon = Leaflet.divIcon({
-        html: `<div style="font-size:18px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))">${p.emoji}</div>`,
-        className: 'custom-marker',
-        iconSize: [28, 28], iconAnchor: [14, 14],
-      })
-      const marker = Leaflet.marker([p.lat, p.lng], { icon: visitedIcon, opacity: isVisited(p.name) ? 1 : 0.35 })
-        .addTo(markersLayer)
-        .bindPopup(`<div style="color:#e8e8f0;font-family:Inter,sans-serif"><b>${p.emoji} ${p.name}</b><br><span style="font-size:11px;color:#888">${p.continent}</span>${!isVisited(p.name) ? '<br><span style="font-size:10px;color:#f0c060">✨ À visiter</span>' : '<br><span style="font-size:10px;color:#4adec0">✅ Visité</span>'}</div>`)
-      marker.on('click', () => mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 0.8 }))
-    })
+  filteredPlaces.value.forEach(p => {
+    const v = isVisited(p.name)
+    const html = v
+      ? `<div style="position:relative;width:36px;height:36px;display:flex;align-items:center;justify-content:center">
+           <div style="position:absolute;inset:-4px;border-radius:50%;background:radial-gradient(circle,#4adec040 0%,#4adec020 60%,transparent 70%);animation:pulse 2s ease-in-out infinite"></div>
+           <div style="position:absolute;inset:-2px;border-radius:50%;border:2px solid #4adec060;box-shadow:0 0 12px #4adec040"></div>
+           <span style="font-size:18px;position:relative;z-index:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,.8))">${p.emoji}</span>
+         </div>`
+      : `<div style="opacity:.4;filter:grayscale(.6)"><span style="font-size:16px">${p.emoji}</span></div>`
+    
+    const icon = Leaflet.divIcon({ html, className: 'custom-marker', iconSize: v ? [44, 44] : [28, 28], iconAnchor: v ? [22, 22] : [14, 14] })
+    Leaflet.marker([p.lat, p.lng], { icon }).addTo(markersLayer)
+      .bindPopup(`<div style="color:#e8e8f0;font-family:Inter,sans-serif"><b>${p.emoji} ${p.name}</b><br><span style="font-size:11px;color:#888">${p.continent}</span>${!v ? '<br><span style="font-size:10px;color:#f0c060">✨ À visiter</span>' : '<br><span style="font-size:10px;color:#4adec0">🍭 Visité !</span>'}</div>`)
   })
 }
 
@@ -209,4 +211,5 @@ function flyToPlace(p: any) {
 .leaflet-container { background: #1a1a24; z-index: 1; }
 .leaflet-popup-content-wrapper { background: #1a1a24 !important; color: #e8e8f0 !important; border: 1px solid #2a2a3e !important; border-radius: 12px !important; }
 .leaflet-popup-tip { background: #1a1a24 !important; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.3); } }
 </style>
