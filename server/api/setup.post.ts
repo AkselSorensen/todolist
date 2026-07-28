@@ -70,7 +70,51 @@ export default defineEventHandler(async () => {
     )
   `)
 
-  // Seed default data
+  // Countries table
+  await query(`
+    CREATE TABLE IF NOT EXISTS countries (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      en_name TEXT NOT NULL,
+      lat REAL NOT NULL,
+      lng REAL NOT NULL,
+      continent TEXT NOT NULL DEFAULT 'Europe',
+      emoji TEXT NOT NULL DEFAULT '🌍'
+    )
+  `)
+
+  // Seed countries if empty
+  const existingCountries = await query('SELECT COUNT(*) as c FROM countries')
+  if (parseInt(existingCountries.rows[0].c) === 0) {
+    const seedCountries = [
+      ['France','France',46.6,2.3,'Europe','🇫🇷'],['Italie','Italy',41.9,12.5,'Europe','🇮🇹'],['Espagne','Spain',40.4,-3.7,'Europe','🇪🇸'],
+      ['Portugal','Portugal',39.4,-8.2,'Europe','🇵🇹'],['Royaume-Uni','United Kingdom',55.4,-3.4,'Europe','🇬🇧'],['Allemagne','Germany',51.2,10.5,'Europe','🇩🇪'],
+      ['Suisse','Switzerland',46.8,8.2,'Europe','🇨🇭'],['Autriche','Austria',47.5,14.6,'Europe','🇦🇹'],['Grèce','Greece',39.1,21.8,'Europe','🇬🇷'],
+      ['Pays-Bas','Netherlands',52.1,5.3,'Europe','🇳🇱'],['Belgique','Belgium',50.5,4.5,'Europe','🇧🇪'],['Suède','Sweden',60.1,18.6,'Europe','🇸🇪'],
+      ['Norvège','Norway',60.5,8.5,'Europe','🇳🇴'],['Danemark','Denmark',56.3,9.5,'Europe','🇩🇰'],['Finlande','Finland',61.9,25.7,'Europe','🇫🇮'],
+      ['Islande','Iceland',65.0,-19.0,'Europe','🇮🇸'],['Irlande','Ireland',53.4,-8.2,'Europe','🇮🇪'],['Pologne','Poland',51.9,19.1,'Europe','🇵🇱'],
+      ['Rép. Tchèque','Czechia',49.8,15.5,'Europe','🇨🇿'],['Hongrie','Hungary',47.2,19.5,'Europe','🇭🇺'],['Roumanie','Romania',45.9,25.0,'Europe','🇷🇴'],
+      ['Croatie','Croatia',45.1,15.2,'Europe','🇭🇷'],['Ukraine','Ukraine',48.4,31.2,'Europe','🇺🇦'],['Turquie','Turkey',39.0,35.2,'Asie','🇹🇷'],
+      ['Russie','Russia',61.5,105.3,'Europe','🇷🇺'],['Japon','Japan',36.2,138.3,'Asie','🇯🇵'],['Chine','China',35.9,104.2,'Asie','🇨🇳'],
+      ['Inde','India',20.6,79.0,'Asie','🇮🇳'],['Thaïlande','Thailand',15.9,101.0,'Asie','🇹🇭'],['Vietnam','Vietnam',14.1,108.3,'Asie','🇻🇳'],
+      ['Indonésie','Indonesia',-0.8,113.9,'Asie','🇮🇩'],['Corée du Sud','South Korea',35.9,127.8,'Asie','🇰🇷'],['Singapour','Singapore',1.4,103.8,'Asie','🇸🇬'],
+      ['Maldives','Maldives',3.2,73.2,'Asie','🇲🇻'],['Émirats A. U.','United Arab Emirates',23.4,53.8,'Asie','🇦🇪'],['Israël','Israel',31.0,34.9,'Asie','🇮🇱'],
+      ['Jordanie','Jordan',30.6,36.2,'Asie','🇯🇴'],['Cambodge','Cambodia',12.6,105.0,'Asie','🇰🇭'],['Philippines','Philippines',12.9,121.8,'Asie','🇵🇭'],
+      ['Népal','Nepal',28.4,84.1,'Asie','🇳🇵'],['Sri Lanka','Sri Lanka',7.9,80.8,'Asie','🇱🇰'],['États-Unis','United States of America',37.1,-95.7,'Amérique','🇺🇸'],
+      ['Canada','Canada',56.1,-106.3,'Amérique','🇨🇦'],['Mexique','Mexico',23.6,-102.6,'Amérique','🇲🇽'],['Brésil','Brazil',-14.2,-51.9,'Amérique','🇧🇷'],
+      ['Argentine','Argentina',-38.4,-63.6,'Amérique','🇦🇷'],['Colombie','Colombia',4.6,-74.3,'Amérique','🇨🇴'],['Pérou','Peru',-9.2,-75.0,'Amérique','🇵🇪'],
+      ['Cuba','Cuba',21.5,-77.8,'Amérique','🇨🇺'],['Costa Rica','Costa Rica',9.7,-83.8,'Amérique','🇨🇷'],['Rép. Dominicaine','Dominican Republic',18.7,-70.2,'Amérique','🇩🇴'],
+      ['Chili','Chile',-35.7,-71.5,'Amérique','🇨🇱'],['Maroc','Morocco',31.8,-7.1,'Afrique','🇲🇦'],['Égypte','Egypt',26.8,30.8,'Afrique','🇪🇬'],
+      ['Afrique du Sud','South Africa',-30.6,22.9,'Afrique','🇿🇦'],['Kenya','Kenya',-0.02,37.9,'Afrique','🇰🇪'],['Tanzanie','United Republic of Tanzania',-6.4,34.9,'Afrique','🇹🇿'],
+      ['Sénégal','Senegal',14.5,-14.5,'Afrique','🇸🇳'],['Tunisie','Tunisia',33.9,9.5,'Afrique','🇹🇳'],['Madagascar','Madagascar',-18.8,46.9,'Afrique','🇲🇬'],
+      ['Maurice','Mauritius',-20.3,57.6,'Afrique','🇲🇺'],['Seychelles','Seychelles',-4.7,55.5,'Afrique','🇸🇨'],['Nigeria','Nigeria',9.1,8.7,'Afrique','🇳🇬'],
+      ['Ghana','Ghana',7.9,-1.0,'Afrique','🇬🇭'],['Australie','Australia',-25.3,133.8,'Océanie','🇦🇺'],['Nouvelle-Zélande','New Zealand',-40.9,174.9,'Océanie','🇳🇿'],
+      ['Fidji','Fiji',-17.7,178.1,'Océanie','🇫🇯'],
+    ]
+    for (const c of seedCountries) {
+      await query('INSERT INTO countries (name, en_name, lat, lng, continent, emoji) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (name) DO NOTHING', c)
+    }
+  }
   const existingUsers = await query('SELECT COUNT(*) as c FROM users')
   if (parseInt(existingUsers.rows[0].c) === 0) {
     await query(`INSERT INTO users (name, color) VALUES ('Aksel', '#ff6b8a'), ('Amandine', '#a78bfa')`)
