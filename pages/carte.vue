@@ -7,23 +7,14 @@ useHead({
   link: [{ rel: 'stylesheet', href: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' }]
 })
 
-// All data from DB
 const allPlaces = ref<any[]>([])
-const visited = ref<string[]>([])
+const visited = ref<any[]>([]) // { country_name, visited_by }
 
 async function loadCountries() { try { allPlaces.value = await $fetch('/api/countries') } catch { allPlaces.value = [] } }
 async function loadVisited() { try { visited.value = await $fetch('/api/visited') } catch { visited.value = [] } }
 
-async function toggleVisited(name: string) {
-  try {
-    const res = await $fetch('/api/visited', { method: 'POST', body: { country: name } })
-    if (res.visited) visited.value.push(name)
-    else visited.value = visited.value.filter(v => v !== name)
-    updateGeoJSON()
-    updateMarkers()
-  } catch {}
-}
-function isVisited(name: string) { return visited.value.includes(name) }
+function getVisitedBy(name: string) { return visited.value.find((v: any) => v.country_name === name)?.visited_by || null }
+function isVisited(name: string) { return !!getVisitedBy(name) }
 
 const search = ref('')
 const continentFilter = ref('')
@@ -34,6 +25,34 @@ const filteredPlaces = computed(() => allPlaces.value.filter((p: any) => {
   return ms && mc
 }))
 
+// Modal
+const showModal = ref(false)
+const selectedCountry = ref<any>(null)
+
+function openCountryModal(p: any) {
+  selectedCountry.value = p
+  showModal.value = true
+}
+
+async function saveVisit(countryName: string, visitedBy: string | null) {
+  try {
+    const res = await $fetch('/api/visited', { method: 'POST', body: { country: countryName, visited_by: visitedBy } })
+    if (res.visited) {
+      const idx = visited.value.findIndex((v: any) => v.country_name === countryName)
+      if (idx >= 0) visited.value[idx] = { country_name: countryName, visited_by: res.visited_by }
+      else visited.value.push({ country_name: countryName, visited_by: res.visited_by })
+    } else {
+      visited.value = visited.value.filter((v: any) => v.country_name !== countryName)
+    }
+    showModal.value = false
+    updateGeoJSON()
+    updateMarkers()
+  } catch {}
+}
+
+const visitedByLabel: Record<string, string> = { aksel: '🧑‍💻 Aksel', amandine: '👩‍🎨 Amandine', both: '💞 Les deux' }
+
+// Map
 const mapContainer = ref<HTMLElement | null>(null)
 let mapInstance: any = null, markersLayer: any = null, geoJsonLayer: any = null, LeafletModule: any = null, geoJsonData: any = null
 
@@ -59,6 +78,16 @@ onMounted(async () => {
     if (geoJsonData) {
       geoJsonLayer = L.geoJSON(geoJsonData, {
         style: { fillOpacity: 0, color: 'transparent', weight: 0 },
+        onEachFeature: (feature: any, layer: any) => {
+          layer.on('click', () => {
+            const enName = feature?.properties?.name
+            const place = allPlaces.value.find((p: any) => p.en === enName)
+            if (place) {
+              mapInstance?.flyTo([place.lat, place.lng], 5, { duration: 0.8 })
+              openCountryModal(place)
+            }
+          })
+        },
       }).addTo(mapInstance)
       updateGeoJSON()
     }
@@ -87,15 +116,13 @@ function updateMarkers() {
   filteredPlaces.value.forEach((p: any) => {
     const v = isVisited(p.name)
     const html = `<div style="font-size:16px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.6))">${p.emoji}</div>`
-    const icon = L.divIcon({ html, className: 'custom-marker', iconSize: [28, 28], iconAnchor: [14, 14], 
-      ...(v ? { className: 'custom-marker visited' } : {}) })
-    L.marker([p.lat, p.lng], { icon, opacity: v ? 1 : 0.35 })
-      .addTo(markersLayer)
-      .bindPopup(`<div style="color:#e8e8f0;font-family:Inter,sans-serif"><b>${p.emoji} ${p.name}</b><br><span style="font-size:11px;color:#888">${p.continent}</span>${!v ? '<br><span style="font-size:10px;color:#f0c060">✨ À visiter</span>' : '<br><span style="font-size:10px;color:#F5A623">🍭 Visité !</span>'}</div>`)
+    const icon = L.divIcon({ html, className: 'custom-marker', iconSize: [28, 28], iconAnchor: [14, 14] })
+    const marker = L.marker([p.lat, p.lng], { icon, opacity: v ? 1 : 0.35 }).addTo(markersLayer)
+    marker.on('click', () => openCountryModal(p))
   })
 }
 
-function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 0.8 }) }
+function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 0.8 }); openCountryModal(p) }
 </script>
 
 <template>
@@ -131,13 +158,67 @@ function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 
         @click="flyToPlace(p)">
         <span class="text-xl flex-shrink-0" :class="isVisited(p.name) ? '' : 'opacity-40 grayscale'">{{ p.emoji }}</span>
         <span class="text-sm font-medium text-text truncate flex-1">{{ p.name }}</span>
-        <button @click.stop="toggleVisited(p.name)" class="text-xs flex-shrink-0 transition-colors"
-          :class="isVisited(p.name) ? 'text-gold hover:text-rose' : 'text-text-muted hover:text-gold'">
-          {{ isVisited(p.name) ? '✅' : '☆' }}
-        </button>
+        <span v-if="getVisitedBy(p.name)" class="text-xs flex-shrink-0">{{ getVisitedBy(p.name) === 'aksel' ? '🧑‍💻' : getVisitedBy(p.name) === 'amandine' ? '👩‍🎨' : '💞' }}</span>
       </div>
     </div>
     <p v-if="filteredPlaces.length === 0" class="text-center py-8 text-text-muted">Aucun pays trouvé</p>
+
+    <!-- Country Modal -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showModal && selectedCountry" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="showModal = false" />
+          <div class="relative bg-surface border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <button @click="showModal = false" class="absolute top-4 right-4 text-text-muted hover:text-text transition-colors">
+              <Icon icon="lucide:x" class="w-5 h-5" />
+            </button>
+
+            <div class="text-center mb-4">
+              <span class="text-5xl block mb-2">{{ selectedCountry.emoji }}</span>
+              <h2 class="text-xl font-bold">{{ selectedCountry.name }}</h2>
+              <p class="text-sm text-text-muted">{{ selectedCountry.continent }}</p>
+            </div>
+
+            <!-- Attractions -->
+            <div v-if="selectedCountry.attractions" class="mb-5 p-4 bg-surface2 rounded-xl">
+              <p class="text-xs font-semibold text-text-muted uppercase mb-2 flex items-center gap-1">
+                <Icon icon="lucide:map-pin" class="w-3 h-3" /> À visiter
+              </p>
+              <p class="text-sm text-text leading-relaxed">{{ selectedCountry.attractions }}</p>
+            </div>
+
+            <!-- Visited by -->
+            <div class="mb-5">
+              <p class="text-xs font-semibold text-text-muted uppercase mb-2">Qui a visité ?</p>
+              <div class="grid grid-cols-3 gap-2">
+                <button @click="saveVisit(selectedCountry.name, 'aksel')"
+                  class="py-3 rounded-xl text-sm font-medium transition-all border"
+                  :class="getVisitedBy(selectedCountry.name) === 'aksel' ? 'bg-rose/15 border-rose/30 text-rose' : 'border-border text-text-muted hover:border-rose/30 hover:text-rose'">
+                  🧑‍💻 Aksel
+                </button>
+                <button @click="saveVisit(selectedCountry.name, 'amandine')"
+                  class="py-3 rounded-xl text-sm font-medium transition-all border"
+                  :class="getVisitedBy(selectedCountry.name) === 'amandine' ? 'bg-lavender/15 border-lavender/30 text-lavender' : 'border-border text-text-muted hover:border-lavender/30 hover:text-lavender'">
+                  👩‍🎨 Amandine
+                </button>
+                <button @click="saveVisit(selectedCountry.name, 'both')"
+                  class="py-3 rounded-xl text-sm font-medium transition-all border"
+                  :class="getVisitedBy(selectedCountry.name) === 'both' ? 'bg-gold/15 border-gold/30 text-gold' : 'border-border text-text-muted hover:border-gold/30 hover:text-gold'">
+                  💞 Les deux
+                </button>
+              </div>
+            </div>
+
+            <!-- Remove -->
+            <button v-if="isVisited(selectedCountry.name)" @click="saveVisit(selectedCountry.name, null)"
+              class="w-full py-2.5 rounded-xl border border-rose/30 text-rose text-sm hover:bg-rose/10 transition-colors flex items-center justify-center gap-2">
+              <Icon icon="lucide:trash-2" class="w-4 h-4" /> Retirer des visités
+            </button>
+            <p v-else class="text-center text-sm text-text-muted">Sélectionne qui a visité ce pays 👆</p>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -145,4 +226,7 @@ function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 
 .leaflet-container { background: #1a1a24; z-index: 1; }
 .leaflet-popup-content-wrapper { background: #1a1a24 !important; color: #e8e8f0 !important; border: 1px solid #2a2a3e !important; border-radius: 12px !important; }
 .leaflet-popup-tip { background: #1a1a24 !important; }
+.modal-enter-active, .modal-leave-active { transition: all 0.25s ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-from > div:last-child, .modal-leave-to > div:last-child { transform: scale(0.95) translateY(10px); }
 </style>

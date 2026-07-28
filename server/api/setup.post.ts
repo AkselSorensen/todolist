@@ -66,9 +66,12 @@ export default defineEventHandler(async () => {
     CREATE TABLE IF NOT EXISTS visited_countries (
       id SERIAL PRIMARY KEY,
       country_name TEXT NOT NULL UNIQUE,
+      visited_by TEXT NOT NULL DEFAULT 'both',
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `)
+  // Add visited_by column if missing (migration)
+  await query(`ALTER TABLE visited_countries ADD COLUMN IF NOT EXISTS visited_by TEXT NOT NULL DEFAULT 'both'`)
 
   // Countries table
   await query(`
@@ -79,9 +82,12 @@ export default defineEventHandler(async () => {
       lat REAL NOT NULL,
       lng REAL NOT NULL,
       continent TEXT NOT NULL DEFAULT 'Europe',
-      emoji TEXT NOT NULL DEFAULT '🌍'
+      emoji TEXT NOT NULL DEFAULT '🌍',
+      attractions TEXT DEFAULT ''
     )
   `)
+  // Add attractions column if missing (migration)
+  await query(`ALTER TABLE countries ADD COLUMN IF NOT EXISTS attractions TEXT DEFAULT ''`)
 
   // Seed countries if empty
   const existingCountries = await query('SELECT COUNT(*) as c FROM countries')
@@ -112,9 +118,35 @@ export default defineEventHandler(async () => {
       ['Fidji','Fiji',-17.7,178.1,'Océanie','🇫🇯'],
     ]
     for (const c of seedCountries) {
-      await query('INSERT INTO countries (name, en_name, lat, lng, continent, emoji) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (name) DO NOTHING', c)
+      await query('INSERT INTO countries (name, en_name, lat, lng, continent, emoji, attractions) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (name) DO NOTHING', c)
     }
   }
+
+  // Update attractions for existing countries
+  const attrs: Record<string, string> = {
+    'France': 'Tour Eiffel, Mont Saint-Michel, Châteaux de la Loire, Côte d\'Azur, Versailles, Louvre',
+    'Italie': 'Colisée Rome, Venise, Cinque Terre, Toscane, Côte Amalfitaine, Vatican, Pompéi',
+    'Espagne': 'Sagrada Familia, Alhambra Grenade, Ibiza, Séville, Costa Brava, Musée Prado',
+    'Portugal': 'Tour de Belém, Sintra, Porto, Algarve, Vallée du Douro, Açores',
+    'Royaume-Uni': 'Big Ben, Tower Bridge, Stonehenge, Highlands, Oxford, Château d\'Édimbourg',
+    'Allemagne': 'Château Neuschwanstein, Porte de Brandebourg, Oktoberfest, Forêt-Noire, Mur de Berlin',
+    'Suisse': 'Jungfraujoch, Lac Léman, Zermatt & Matterhorn, Interlaken, Lucerne, Château de Chillon',
+    'Autriche': 'Schönbrunn, Hallstatt, Vienne, Salzbourg, Alpes tyroliennes, Innsbruck',
+    'Grèce': 'Acropole Athènes, Santorin, Mykonos, Crète, Rhodes, Météores, Corfou',
+    'Pays-Bas': 'Canaux Amsterdam, Keukenhof, Moulins Kinderdijk, Rotterdam, Utrecht, Musée Van Gogh',
+    'Belgique': 'Grand-Place Bruxelles, Bruges, Atomium, Gand, Anvers, Ardennes',
+    'Japon': 'Mont Fuji, Tokyo, Kyoto, Osaka, Hiroshima, Nara, Shibuya, Temples',
+    'États-Unis': 'Grand Canyon, New York, Yellowstone, San Francisco, Las Vegas, Miami, Hawaii',
+    'Canada': 'Niagara, Banff, Vancouver, Toronto, Montréal, Québec, Rocheuses',
+    'Mexique': 'Chichén Itzá, Cancún, Mexico, Tulum, Teotihuacán, Cenotes',
+    'Australie': 'Sydney Opera House, Grande Barrière de Corail, Uluru, Melbourne, Gold Coast',
+    'Maroc': 'Marrakech, Fès, Chefchaouen, Sahara, Casablanca, Essaouira',
+    'Égypte': 'Pyramides de Gizeh, Louxor, Croisière Nil, Alexandrie, Abou Simbel, Mer Rouge',
+  }
+  for (const [name, attr] of Object.entries(attrs)) {
+    await query('UPDATE countries SET attractions = $1 WHERE name = $2 AND (attractions IS NULL OR attractions = \'\')', [attr, name])
+  }
+
   const existingUsers = await query('SELECT COUNT(*) as c FROM users')
   if (parseInt(existingUsers.rows[0].c) === 0) {
     await query(`INSERT INTO users (name, color) VALUES ('Aksel', '#ff6b8a'), ('Amandine', '#a78bfa')`)
