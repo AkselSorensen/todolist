@@ -117,6 +117,38 @@ const stats = [
   { icon: 'lucide:calendar-days', label: 'Aujourd\'hui', value: computed(() => todayEvents.value.length), color: 'text-mint', bg: 'bg-mint/10' },
   { icon: 'lucide:check-circle', label: 'Complétés', value: doneCount, color: 'text-gold', bg: 'bg-gold/10' },
 ]
+
+// Countdown — find the next upcoming event
+const nextBigEvent = computed(() => {
+  const now = new Date()
+  const future = events.value
+    .filter((e: any) => new Date(e.start_time) > now)
+    .sort((a: any, b: any) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+  return future[0] || null
+})
+
+const countdown = computed(() => {
+  if (!nextBigEvent.value) return { days: 0, hours: 0 }
+  const diff = new Date(nextBigEvent.value.start_time).getTime() - Date.now()
+  return {
+    days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+    hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+  }
+})
+
+// Roulette
+const randomIdea = ref<any>(null)
+const allIdeas = computed(() => todos.value.filter((t: any) => t.category_name === 'À faire' && t.status === 'todo'))
+
+function spinRoulette() {
+  const ideas = allIdeas.value
+  if (ideas.length === 0) return
+  const pick = ideas[Math.floor(Math.random() * ideas.length)]
+  randomIdea.value = pick
+  nextTick(() => {
+    gsap.fromTo('.animate-slide-up', { autoAlpha: 0, y: 12, scale: 0.95 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.4, ease: 'back.out(1.3)' })
+  })
+}
 </script>
 
 <template>
@@ -147,13 +179,49 @@ const stats = [
     </div>
 
     <!-- Stats -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <div v-for="s in stats" :key="s.label" class="stat-card bg-surface border border-border rounded-2xl p-5 hover:border-rose/20 transition-colors duration-300">
         <div class="w-10 h-10 rounded-xl flex items-center justify-center mb-3" :class="s.bg">
           <Icon :icon="s.icon" class="w-5 h-5" :class="s.color" />
         </div>
         <div class="text-2xl font-bold text-text">{{ s.value.value }}</div>
         <div class="text-sm text-text-muted">{{ s.label }}</div>
+      </div>
+    </div>
+
+    <!-- Compte à rebours -->
+    <div v-if="nextBigEvent" class="mb-6 bg-surface border border-border rounded-2xl p-5 flex items-center gap-4 overflow-hidden relative">
+      <div class="absolute inset-0 bg-gradient-to-r from-rose/5 via-transparent to-lavender/5" />
+      <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 z-10" :style="{ background: (nextBigEvent.color || '#a78bfa') + '20' }">
+        <Icon icon="lucide:clock" class="w-6 h-6" :style="{ color: nextBigEvent.color || '#a78bfa' }" />
+      </div>
+      <div class="flex-1 min-w-0 z-10">
+        <p class="text-sm font-semibold text-text truncate">{{ nextBigEvent.title }}</p>
+        <p class="text-xs text-text-muted">
+          <span v-if="countdown.days > 0" class="text-rose font-bold">{{ countdown.days }} jours</span>
+          <span v-else-if="countdown.hours > 0" class="text-gold font-bold">{{ countdown.hours }} heures</span>
+          <span v-else class="text-mint font-bold">Aujourd'hui !</span>
+          — {{ formatDate(nextBigEvent.start_time) }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Roulette à dates -->
+    <div class="mb-6">
+      <p class="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3 flex items-center gap-2">
+        <span class="w-1 h-3 rounded-full bg-gold/60" /> 🎲 Roulette à dates
+      </p>
+      <div class="bg-surface border border-border rounded-2xl p-6 text-center">
+        <p class="text-text-muted text-sm mb-4">En panne d'inspiration ? Laisse le hasard décider !</p>
+        <div v-if="randomIdea" class="mb-4 p-4 bg-surface2 rounded-xl animate-slide-up" :key="randomIdea.title">
+          <Icon icon="lucide:sparkles" class="w-6 h-6 text-gold mx-auto mb-2" />
+          <p class="text-lg font-bold text-text">{{ randomIdea.title }}</p>
+          <p v-if="randomIdea.description" class="text-sm text-text-muted mt-1">{{ randomIdea.description }}</p>
+        </div>
+        <button @click="spinRoulette"
+          class="px-6 py-3 bg-gradient-to-r from-gold to-rose rounded-xl text-white font-bold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-gold/20 flex items-center gap-2 mx-auto">
+          <Icon icon="lucide:dices" class="w-4 h-4" /> {{ randomIdea ? 'Relancer' : 'Lancer la roulette' }}
+        </button>
       </div>
     </div>
 
