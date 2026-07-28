@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { gsap } from 'gsap'
-import 'leaflet/dist/leaflet.css'
 
 definePageMeta({ layout: 'default' })
+
+useHead({
+  link: [{ rel: 'stylesheet', href: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' }]
+})
 
 const places = [
   { name: 'Paris', lat: 48.8566, lng: 2.3522, emoji: '🗼', desc: 'Tour Eiffel, Montmartre, notre premier Paris' },
@@ -131,3 +134,21 @@ function toggleVisited(index: number) {
     </div>
   </div>
 </template>
+
+<style>
+.leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  background: #1a1a24;
+  z-index: 1;
+}
+.leaflet-popup-content-wrapper {
+  background: #1a1a24 !important;
+  color: #e8e8f0 !important;
+  border: 1px solid #2a2a3e !important;
+  border-radius: 12px !important;
+}
+.leaflet-popup-tip {
+  background: #1a1a24 !important;
+}
+</style>
