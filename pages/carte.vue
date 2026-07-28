@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { gsap } from 'gsap'
+import 'leaflet/dist/leaflet.css'
 
 definePageMeta({ layout: 'default' })
 
@@ -30,13 +31,16 @@ onMounted(async () => {
   
   gsap.fromTo(heroRef.value, { autoAlpha: 0, y: -20 }, { autoAlpha: 1, y: 0, duration: 0.6, ease: 'power3.out' })
   
+  // Small delay to ensure DOM is fully rendered
+  await new Promise(r => setTimeout(r, 100))
+  
   const L = (await import('leaflet')).default
   
   if (mapContainer.value) {
     mapInstance = L.map(mapContainer.value, {
       center: [46, 2],
       zoom: 4,
-      zoomControl: false,
+      zoomControl: true,
       attributionControl: false,
       scrollWheelZoom: true,
     })
@@ -44,6 +48,9 @@ onMounted(async () => {
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       maxZoom: 18,
     }).addTo(mapInstance)
+
+    // Fix tile sizing after render
+    setTimeout(() => mapInstance?.invalidateSize(), 200)
 
     const visitedIcon = L.divIcon({
       html: '<div style="font-size:20px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))">📍</div>',

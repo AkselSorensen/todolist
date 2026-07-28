@@ -25,10 +25,6 @@
             :class="$route.path === '/carte' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
             <Icon icon="lucide:globe" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden xs:inline">Carte</span>
           </NuxtLink>
-          <NuxtLink to="/histoire" class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
-            :class="$route.path === '/histoire' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
-            <Icon icon="lucide:timeline" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden xs:inline">Histoire</span>
-          </NuxtLink>
         </div>
       </div>
     </nav>
