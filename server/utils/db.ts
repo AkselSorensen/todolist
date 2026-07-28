@@ -5,8 +5,8 @@ let pool: pg.Pool | null = null
 
 export function getDb(): pg.Pool {
   if (pool) return pool
-  const url = process.env.DATABASE_URL || useRuntimeConfig().databaseUrl
-  if (!url) throw new Error('DATABASE_URL missing')
+  const url = process.env.DATABASE_URL
+  if (!url) throw new Error('DATABASE_URL missing — add it in Vercel Settings > Environment Variables')
   pool = new Pool({
     connectionString: url,
     max: 5,

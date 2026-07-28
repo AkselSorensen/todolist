@@ -1,4 +1,4 @@
-const CACHE = 'nousdeux-v1'
+const CACHE = 'nousdeux-v2'
 
 self.addEventListener('install', () => { self.skipWaiting() })
 
@@ -16,7 +16,14 @@ self.addEventListener('message', (e) => {
 })
 
 self.addEventListener('fetch', (e) => {
+  // Only cache GET requests — POST/PATCH/DELETE passthrough
+  if (e.request.method !== 'GET') return
+
   const url = new URL(e.request.url)
+  // API calls: network-first, no cache
+  if (url.pathname.startsWith('/api/')) return
+
+  // Same-origin assets: network-first
   if (url.origin === self.location.origin) {
     e.respondWith(
       fetch(e.request)
@@ -31,5 +38,4 @@ self.addEventListener('fetch', (e) => {
     )
     return
   }
-  e.respondWith(fetch(e.request))
 })
