@@ -11,20 +11,26 @@ const loading = ref(true)
 const showModal = ref(false)
 const editingEvent = ref<any>(null)
 const selectedDate = ref('')
+const selectedEndDate = ref('')
 const eventFormRef = ref<HTMLFormElement | null>(null)
 
 const currentMonth = ref(new Date().getMonth())
 const currentYear = ref(new Date().getFullYear())
 const today = new Date()
 
+// Multi-day range selection
+const rangeStart = ref<string | null>(null)
+const rangeEnd = ref<string | null>(null)
+
 const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
 const eventTypes: Record<string, { icon: string; label: string; color: string }> = {
   date_night: { icon: 'lucide:heart', label: 'Date night', color: '#ff6b8a' },
+  event: { icon: 'lucide:calendar', label: 'Événement', color: '#a78bfa' },
+  trip: { icon: 'lucide:plane', label: 'Voyage', color: '#f0c060' },
   availability: { icon: 'lucide:circle-check', label: 'Disponibilité', color: '#4adec0' },
   reminder: { icon: 'lucide:bell', label: 'Rappel', color: '#f0c060' },
-  event: { icon: 'lucide:calendar', label: 'Événement', color: '#a78bfa' },
 }
 
 const colorOptions = ['#ff6b8a', '#a78bfa', '#f0c060', '#4adec0', '#60a5fa']
@@ -33,23 +39,33 @@ const calendarDays = computed(() => {
   const firstDay = new Date(currentYear.value, currentMonth.value, 1)
   const lastDay = new Date(currentYear.value, currentMonth.value + 1, 0)
   const startOffset = (firstDay.getDay() + 6) % 7
-  const days: { date: Date; isCurrentMonth: boolean; isToday: boolean }[] = []
+  const days: { date: Date; isCurrentMonth: boolean; isToday: boolean; isInRange: boolean; isRangeStart: boolean; isRangeEnd: boolean }[] = []
 
   for (let i = startOffset - 1; i >= 0; i--) {
     const d = new Date(currentYear.value, currentMonth.value, -i)
-    days.push({ date: d, isCurrentMonth: false, isToday: isSameDay(d, today) })
+    days.push({ date: d, isCurrentMonth: false, isToday: isSameDay(d, today), ...rangeFlags(d) })
   }
   for (let i = 1; i <= lastDay.getDate(); i++) {
     const d = new Date(currentYear.value, currentMonth.value, i)
-    days.push({ date: d, isCurrentMonth: true, isToday: isSameDay(d, today) })
+    days.push({ date: d, isCurrentMonth: true, isToday: isSameDay(d, today), ...rangeFlags(d) })
   }
   while (days.length < 42) {
     const last = days[days.length - 1].date
     const d = new Date(last); d.setDate(d.getDate() + 1)
-    days.push({ date: d, isCurrentMonth: false, isToday: isSameDay(d, today) })
+    days.push({ date: d, isCurrentMonth: false, isToday: isSameDay(d, today), ...rangeFlags(d) })
   }
   return days
 })
+
+function rangeFlags(d: Date) {
+  const ds = toDateStr(d)
+  const inRange = rangeStart.value && rangeEnd.value && ds >= rangeStart.value && ds <= rangeEnd.value
+  return {
+    isInRange: !!inRange,
+    isRangeStart: rangeStart.value === ds,
+    isRangeEnd: rangeEnd.value === ds,
+  }
+}
 
 function isSameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate() }
 function toDateStr(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
@@ -59,7 +75,8 @@ function getEventsForDay(date: Date) {
   return events.value.filter((e: any) => {
     const start = e.start_time?.split('T')[0]
     const end = e.end_time?.split('T')[0]
-    return start === ds || (e.all_day && end && start <= ds && end >= ds)
+    if (end && end !== start) return ds >= start && ds <= end
+    return start === ds
   })
 }
 
@@ -74,8 +91,7 @@ async function loadData() {
   const startDate = new Date(currentYear.value, currentMonth.value - 1, 1)
   const endDate = new Date(currentYear.value, currentMonth.value + 2, 0)
   const [e, u] = await Promise.all([fetchEvents(startDate.toISOString(), endDate.toISOString()), fetchUsers()])
-  events.value = e || []
-  users.value = u || []
+  events.value = e || []; users.value = u || []
   loading.value = false
   await nextTick()
   ctx?.revert()
@@ -85,21 +101,66 @@ async function loadData() {
   })
 }
 
-function openCreateForDay(date: Date) { selectedDate.value = toDateStr(date); editingEvent.value = null; showModal.value = true }
-function openEditEvent(evt: any) { editingEvent.value = { ...evt }; showModal.value = true }
+function handleDayClick(date: Date) {
+  const ds = toDateStr(date)
+
+  // If no range started, or we're starting a new range
+  if (!rangeStart.value || (rangeStart.value && rangeEnd.value)) {
+    rangeStart.value = ds
+    rangeEnd.value = null
+    return
+  }
+
+  // Second click: complete the range
+  if (ds < rangeStart.value) {
+    rangeEnd.value = rangeStart.value
+    rangeStart.value = ds
+  } else {
+    rangeEnd.value = ds
+  }
+
+  // Open modal with range pre-filled
+  selectedDate.value = rangeStart.value
+  selectedEndDate.value = rangeEnd.value
+  editingEvent.value = null
+  if (rangeStart.value !== rangeEnd.value) {
+    // Multi-day → pre-select trip type
+    editingEvent.value = null
+  }
+  showModal.value = true
+}
+
+function clearRange() {
+  rangeStart.value = null
+  rangeEnd.value = null
+}
+
+function openEditEvent(evt: any) {
+  const start = evt.start_time?.split('T')[0] || ''
+  const end = evt.end_time?.split('T')[0] || ''
+  editingEvent.value = { ...evt }
+  selectedDate.value = start
+  selectedEndDate.value = end !== start ? end : ''
+  rangeStart.value = start
+  rangeEnd.value = end !== start ? end : start
+  showModal.value = true
+}
 
 function onSubmitEvent() {
   if (!eventFormRef.value) return
   const fd = new FormData(eventFormRef.value)
   const startDate = fd.get('start_date') as string
+  const endDate = fd.get('end_date') as string
   const startTime = fd.get('start_time') as string
   const allDay = fd.get('all_day') === 'on'
+  const hasEnd = endDate && endDate !== startDate
+
   handleSave({
     title: fd.get('title'),
     description: fd.get('description'),
     event_type: fd.get('event_type'),
     start_time: allDay ? startDate + 'T00:00:00.000Z' : startDate + 'T' + (startTime || '00:00') + ':00.000Z',
-    end_time: allDay ? null : startDate + 'T23:59:00.000Z',
+    end_time: hasEnd ? endDate + 'T23:59:59.000Z' : (allDay ? null : startDate + 'T23:59:00.000Z'),
     all_day: allDay,
     alert_before: parseInt(fd.get('alert_before') as string) || 0,
     color: fd.get('color'),
@@ -112,6 +173,7 @@ async function handleSave(data: any) {
   if (editingEvent.value) await deleteEvent(editingEvent.value.id)
   await createEvent(data)
   showModal.value = false; editingEvent.value = null
+  clearRange()
   await loadData()
 }
 
@@ -119,8 +181,19 @@ async function handleDelete(id: number) { await deleteEvent(id); await loadData(
 
 function formatTime(s: string) { if (!s) return ''; return new Date(s).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }
 function formatDateNice(s: string) { if (!s) return ''; return new Date(s).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }
+function formatDateRange(evt: any) {
+  const start = evt.start_time?.split('T')[0]
+  const end = evt.end_time?.split('T')[0]
+  if (!start) return ''
+  const s = new Date(start).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  if (end && end !== start) {
+    const e = new Date(end).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+    return `${s} → ${e}`
+  }
+  return new Date(start).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+}
 
-watch([currentMonth, currentYear], loadData)
+watch([currentMonth, currentYear], () => { clearRange(); loadData() })
 onMounted(loadData)
 onUnmounted(() => ctx?.revert())
 </script>
@@ -134,12 +207,21 @@ onUnmounted(() => ctx?.revert())
           <Icon icon="lucide:calendar-days" class="w-6 sm:w-7 h-6 sm:h-7 text-lavender" />
           Calendrier
         </h1>
-        <p class="text-text-muted text-xs sm:text-sm mt-1">Nos disponibilités, sorties et rappels</p>
+        <p class="text-text-muted text-xs sm:text-sm mt-1">
+          <span v-if="rangeStart && !rangeEnd" class="text-lavender">Clique une 2ᵉ date pour définir une plage</span>
+          <span v-else>Nos disponibilités, sorties et rappels</span>
+        </p>
       </div>
-      <button @click="showModal = true; editingEvent = null; selectedDate = toDateStr(new Date())"
-        class="px-5 py-2.5 bg-gradient-to-r from-lavender to-rose rounded-xl text-white font-semibold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-lavender/20 flex items-center gap-2">
-        <Icon icon="lucide:plus" class="w-4 h-4" /> Nouvel événement
-      </button>
+      <div class="flex items-center gap-2">
+        <button v-if="rangeStart || rangeEnd" @click="clearRange"
+          class="px-3 py-2 rounded-xl border border-border text-text-muted text-xs hover:bg-surface2 transition-colors">
+          <Icon icon="lucide:x" class="w-3 h-3 inline mr-1" />Annuler sélection
+        </button>
+        <button @click="showModal = true; editingEvent = null; selectedDate = toDateStr(new Date()); selectedEndDate = ''; clearRange()"
+          class="px-5 py-2.5 bg-gradient-to-r from-lavender to-rose rounded-xl text-white font-semibold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-lavender/20 flex items-center gap-2">
+          <Icon icon="lucide:plus" class="w-4 h-4" /> Nouvel événement
+        </button>
+      </div>
     </div>
 
     <!-- Month nav -->
@@ -159,13 +241,21 @@ onUnmounted(() => ctx?.revert())
         <div v-for="day in dayNames" :key="day" class="p-3 text-center text-xs font-semibold text-text-muted">{{ day }}</div>
       </div>
       <div class="grid grid-cols-7">
-        <div v-for="(day, i) in calendarDays" :key="i" @dblclick="openCreateForDay(day.date)"
-          class="cal-day min-h-[60px] sm:min-h-[90px] p-1 sm:p-2 border-b border-r border-border/50 cursor-pointer hover:bg-surface2/50 transition-colors relative"
-          :class="{ 'opacity-30': !day.isCurrentMonth, 'bg-lavender/5': day.isToday }">
+        <div v-for="(day, i) in calendarDays" :key="i" @click="handleDayClick(day.date)"
+          class="cal-day min-h-[60px] sm:min-h-[90px] p-1 sm:p-2 border-b border-r border-border/50 cursor-pointer hover:bg-surface2/50 transition-colors relative select-none"
+          :class="{
+            'opacity-30': !day.isCurrentMonth,
+            'bg-lavender/5': day.isToday && !day.isInRange,
+            'bg-lavender/10': day.isInRange,
+            'ring-1 ring-inset ring-lavender/40': day.isRangeStart || day.isRangeEnd,
+          }">
           <div class="flex items-center justify-between mb-0.5 sm:mb-1">
-            <span class="text-[10px] sm:text-xs font-medium" :class="day.isToday ? 'bg-lavender text-white w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center' : 'text-text-muted'">
+            <span class="text-[10px] sm:text-xs font-medium"
+              :class="day.isToday && !day.isInRange ? 'bg-lavender text-white w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center' : (day.isRangeStart || day.isRangeEnd ? 'text-lavender font-bold' : 'text-text-muted')">
               {{ day.date.getDate() }}
             </span>
+            <span v-if="day.isRangeStart" class="text-[8px] text-lavender font-semibold">DÉBUT</span>
+            <span v-else-if="day.isRangeEnd" class="text-[8px] text-lavender font-semibold">FIN</span>
           </div>
           <div class="space-y-0.5 hidden sm:block">
             <div v-for="evt in getEventsForDay(day.date).slice(0, 3)" :key="evt.id" @click.stop="openEditEvent(evt)"
@@ -174,13 +264,9 @@ onUnmounted(() => ctx?.revert())
               <Icon :icon="eventTypes[evt.event_type]?.icon || 'lucide:calendar'" class="w-2.5 h-2.5 flex-shrink-0" />
               {{ evt.title }}
             </div>
-            <div v-if="getEventsForDay(day.date).length > 3" class="text-[10px] text-text-muted px-1.5">
-              +{{ getEventsForDay(day.date).length - 3 }}
-            </div>
           </div>
-          <!-- Mobile dot indicator -->
           <div v-if="getEventsForDay(day.date).length > 0" class="sm:hidden flex justify-center gap-0.5 mt-0.5">
-            <div v-for="(evt, ei) in getEventsForDay(day.date).slice(0, 3)" :key="ei"
+            <div v-for="(evt, ei) in getEventsForDay(day.date).slice(0, 4)" :key="ei"
               class="w-1.5 h-1.5 rounded-full" :style="{ background: evt.color || '#a78bfa' }" />
           </div>
         </div>
@@ -196,8 +282,7 @@ onUnmounted(() => ctx?.revert())
         <Icon icon="lucide:loader-circle" class="w-8 h-8 mx-auto animate-spin mb-3" /> Chargement...
       </div>
       <div v-else-if="events.length === 0" class="text-center py-12 text-text-muted bg-surface border border-border rounded-2xl">
-        <Icon icon="lucide:calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-40" />
-        <p>Aucun événement</p>
+        <Icon icon="lucide:calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-40" /><p>Aucun événement</p>
       </div>
       <div v-else class="space-y-2">
         <TransitionGroup name="list">
@@ -209,10 +294,7 @@ onUnmounted(() => ctx?.revert())
             <div class="flex-1 min-w-0">
               <p class="font-medium text-sm">{{ evt.title }}</p>
               <p v-if="evt.description" class="text-xs text-text-muted mt-0.5 truncate">{{ evt.description }}</p>
-              <p class="text-xs text-text-muted mt-1">
-                {{ formatDateNice(evt.start_time) }}
-                <span v-if="evt.start_time && !evt.all_day"> à {{ formatTime(evt.start_time) }}</span>
-              </p>
+              <p class="text-xs text-text-muted mt-1">{{ formatDateRange(evt) }}</p>
             </div>
             <div class="flex items-center gap-2">
               <span class="text-[10px] px-2 py-0.5 rounded-full border border-border text-text-muted flex items-center gap-1">
@@ -233,14 +315,17 @@ onUnmounted(() => ctx?.revert())
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="showModal = false" />
+          <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="showModal = false; clearRange()" />
           <div class="relative bg-surface border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-bold mb-4">{{ editingEvent ? 'Modifier' : 'Nouvel événement' }}</h3>
+            <h3 class="text-lg font-bold mb-4">
+              {{ editingEvent ? 'Modifier' : (selectedEndDate ? 'Nouvel événement multi-jours' : 'Nouvel événement') }}
+            </h3>
             <form ref="eventFormRef" @submit.prevent="onSubmitEvent" class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-text-muted mb-1">Titre *</label>
                 <input name="title" required :value="editingEvent?.title || ''"
-                  class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors" />
+                  class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors"
+                  :placeholder="selectedEndDate ? 'ex: Week-end à Rome' : 'ex: Soirée netflix'" />
               </div>
               <div>
                 <label class="block text-sm font-medium text-text-muted mb-1">Description</label>
@@ -251,7 +336,8 @@ onUnmounted(() => ctx?.revert())
                 <div>
                   <label class="block text-sm font-medium text-text-muted mb-1">Type</label>
                   <select name="event_type" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none">
-                    <option v-for="(et, key) in eventTypes" :key="key" :value="key" :selected="(editingEvent?.event_type || 'event') === key">
+                    <option v-for="(et, key) in eventTypes" :key="key" :value="key"
+                      :selected="(editingEvent?.event_type || (selectedEndDate ? 'trip' : 'event')) === key">
                       {{ et.label }}
                     </option>
                   </select>
@@ -272,13 +358,19 @@ onUnmounted(() => ctx?.revert())
               </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-sm font-medium text-text-muted mb-1">Date *</label>
+                  <label class="block text-sm font-medium text-text-muted mb-1">
+                    {{ selectedEndDate ? 'Du' : 'Date' }} *
+                  </label>
                   <input type="date" name="start_date" required :value="editingEvent?.start_time?.split('T')[0] || selectedDate"
                     class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-text-muted mb-1">Heure</label>
-                  <input type="time" name="start_time" :value="editingEvent?.start_time?.split('T')[1]?.slice(0, 5) || ''"
+                  <label class="block text-sm font-medium text-text-muted mb-1">{{ selectedEndDate ? 'Au' : 'Heure' }}</label>
+                  <input v-if="selectedEndDate || editingEvent?.end_time?.split('T')[0] !== editingEvent?.start_time?.split('T')[0]" type="date" name="end_date"
+                    :value="editingEvent?.end_time?.split('T')[0] || selectedEndDate"
+                    class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+                  <input v-else type="time" name="start_time"
+                    :value="editingEvent?.start_time?.split('T')[1]?.slice(0, 5) || ''"
                     class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
                 </div>
               </div>
@@ -304,7 +396,7 @@ onUnmounted(() => ctx?.revert())
                 </select>
               </div>
               <div class="flex gap-3 pt-2">
-                <button type="button" @click="showModal = false"
+                <button type="button" @click="showModal = false; clearRange()"
                   class="flex-1 py-2.5 rounded-xl border border-border text-text-muted text-sm hover:bg-surface2 transition-colors">Annuler</button>
                 <button type="submit"
                   class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm hover:scale-[1.02] transition-transform flex items-center justify-center gap-2">

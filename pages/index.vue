@@ -69,8 +69,8 @@ function formatDate(date: string) {
 const quickActions = [
   { icon: 'lucide:heart', label: 'Proposer une date', color: 'from-rose to-rose-soft', desc: 'Date night', action: () => { quickEventType.value = 'date_night'; showQuickEvent.value = true } },
   { icon: 'lucide:map-pin', label: 'Proposer une sortie', color: 'from-lavender to-rose', desc: 'Resto, ciné, balade...', action: () => { quickEventType.value = 'event'; showQuickEvent.value = true } },
-  { icon: 'lucide:plus-circle', label: 'Suggérer une activité', color: 'from-gold to-rose', desc: 'Ajouter à faire', action: () => { showQuickTodo.value = true } },
-  { icon: 'lucide:circle-check', label: 'Indiquer mes dispos', color: 'from-mint to-lavender', desc: 'Ajouter au calendrier', action: () => { quickEventType.value = 'availability'; showQuickEvent.value = true } },
+  { icon: 'lucide:plane', label: 'Proposer un voyage', color: 'from-gold to-rose', desc: 'Week-end, vacances...', action: () => { quickEventType.value = 'trip'; showQuickEvent.value = true } },
+  { icon: 'lucide:plus-circle', label: 'Suggérer une activité', color: 'from-mint to-lavender', desc: 'Ajouter à faire', action: () => { showQuickTodo.value = true } },
 ]
 
 async function onSubmitQuickTodo() {
@@ -93,13 +93,17 @@ async function onSubmitQuickEvent() {
   if (!quickEventRef.value) return
   const fd = new FormData(quickEventRef.value)
   const date = fd.get('start_date') as string || today
+  const endDate = fd.get('end_date') as string
+  const hasEnd = endDate && endDate !== date
+  const colors: Record<string, string> = { date_night: '#ff6b8a', trip: '#f0c060', event: '#a78bfa', availability: '#4adec0', reminder: '#f0c060' }
   await createEvent({
     title: fd.get('title'),
     description: fd.get('description') || '',
     event_type: quickEventType.value,
     start_time: date + 'T00:00:00.000Z',
+    end_time: hasEnd ? endDate + 'T23:59:59.000Z' : null,
     all_day: true,
-    color: quickEventType.value === 'date_night' ? '#ff6b8a' : quickEventType.value === 'availability' ? '#4adec0' : '#a78bfa',
+    color: colors[quickEventType.value] || '#a78bfa',
     created_by: 2,
   })
   showQuickEvent.value = false
@@ -242,21 +246,27 @@ const stats = [
           <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="showQuickEvent = false" />
           <div class="relative bg-surface border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl">
             <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-              <Icon :icon="quickEventType === 'date_night' ? 'lucide:heart' : quickEventType === 'availability' ? 'lucide:circle-check' : 'lucide:map-pin'" class="w-5 h-5 text-rose" />
-              {{ quickEventType === 'date_night' ? 'Proposer une date' : quickEventType === 'availability' ? 'Indiquer mes dispos' : 'Proposer une sortie' }}
+              <Icon :icon="quickEventType === 'date_night' ? 'lucide:heart' : quickEventType === 'trip' ? 'lucide:plane' : quickEventType === 'availability' ? 'lucide:circle-check' : 'lucide:map-pin'" class="w-5 h-5 text-rose" />
+              {{ quickEventType === 'date_night' ? 'Proposer une date' : quickEventType === 'trip' ? 'Proposer un voyage' : quickEventType === 'availability' ? 'Indiquer mes dispos' : 'Proposer une sortie' }}
             </h3>
             <form ref="quickEventRef" @submit.prevent="onSubmitQuickEvent" class="space-y-4">
               <div>
                 <label class="block text-sm font-medium text-text-muted mb-1">Titre *</label>
-                <input name="title" required :placeholder="quickEventType === 'date_night' ? 'ex: Soirée romantique...' : quickEventType === 'availability' ? 'ex: Dispo toute la journée' : 'ex: Resto italien, ciné...'" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors" />
+                <input name="title" required :placeholder="quickEventType === 'date_night' ? 'ex: Soirée romantique...' : quickEventType === 'trip' ? 'ex: Week-end à Amsterdam' : quickEventType === 'availability' ? 'ex: Dispo toute la journée' : 'ex: Resto italien, ciné...'" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors" />
               </div>
               <div v-if="quickEventType !== 'availability'">
                 <label class="block text-sm font-medium text-text-muted mb-1">Description</label>
                 <textarea name="description" rows="2" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors resize-none" placeholder="Détails, lieu..." />
               </div>
-              <div>
-                <label class="block text-sm font-medium text-text-muted mb-1">Date</label>
-                <input type="date" name="start_date" :value="today" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+              <div class="grid gap-3" :class="quickEventType === 'trip' ? 'grid-cols-2' : 'grid-cols-1'">
+                <div>
+                  <label class="block text-sm font-medium text-text-muted mb-1">{{ quickEventType === 'trip' ? 'Du' : 'Date' }}</label>
+                  <input type="date" name="start_date" :value="today" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+                </div>
+                <div v-if="quickEventType === 'trip'">
+                  <label class="block text-sm font-medium text-text-muted mb-1">Au</label>
+                  <input type="date" name="end_date" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+                </div>
               </div>
               <div class="flex gap-3 pt-2">
                 <button type="button" @click="showQuickEvent = false" class="flex-1 py-2.5 rounded-xl border border-border text-text-muted text-sm hover:bg-surface2 transition-colors">Annuler</button>
