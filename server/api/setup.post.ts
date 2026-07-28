@@ -61,6 +61,15 @@ export default defineEventHandler(async () => {
   await query(`ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_event_type_check`)
   await query(`ALTER TABLE calendar_events ADD CONSTRAINT calendar_events_event_type_check CHECK (event_type IN ('event', 'availability', 'reminder', 'date_night', 'trip'))`)
 
+  // Visited countries table
+  await query(`
+    CREATE TABLE IF NOT EXISTS visited_countries (
+      id SERIAL PRIMARY KEY,
+      country_name TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
   // Seed default data
   const existingUsers = await query('SELECT COUNT(*) as c FROM users')
   if (parseInt(existingUsers.rows[0].c) === 0) {

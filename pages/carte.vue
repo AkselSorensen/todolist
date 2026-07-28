@@ -79,27 +79,23 @@ const allPlaces = [
   { name: 'Polynésie Française', lat: -17.679742, lng: -149.406843, continent: 'Océanie', emoji: '🇵🇫' },
 ]
 
-// Persisted visited state
-const STORAGE_KEY = 'nousdeux-visited'
+// Persisted visited state — from DB
 const visited = ref<string[]>([])
 
-onMounted(() => {
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved) visited.value = JSON.parse(saved)
-})
+async function loadVisited() {
+  try { visited.value = await $fetch('/api/visited') } catch { visited.value = [] }
+}
 
-function saveVisited() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(visited.value))
+async function toggleVisited(name: string) {
+  try {
+    const res = await $fetch('/api/visited', { method: 'POST', body: { country: name } })
+    if (res.visited) visited.value.push(name)
+    else visited.value = visited.value.filter(v => v !== name)
+    updateMarkers()
+  } catch {}
 }
 
 function isVisited(name: string) { return visited.value.includes(name) }
-function toggleVisited(name: string) {
-  const idx = visited.value.indexOf(name)
-  if (idx >= 0) visited.value.splice(idx, 1)
-  else visited.value.push(name)
-  saveVisited()
-  updateMarkers()
-}
 
 // Filters
 const search = ref('')
@@ -120,6 +116,7 @@ let mapInstance: any = null
 let markersLayer: any = null
 
 onMounted(async () => {
+  await loadVisited()
   await nextTick()
   await new Promise(r => setTimeout(r, 200))
   
