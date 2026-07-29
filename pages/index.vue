@@ -4,7 +4,51 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger'
 
 definePageMeta({ layout: 'default' })
 
+useHead({
+  link: [{ rel: 'stylesheet', href: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' }]
+})
+
 const { fetchTodos, fetchEvents, fetchUsers, createTodo, createEvent, setupDb } = useApi()
+
+// Mini map
+const miniMapRef = ref<HTMLElement | null>(null)
+const visitedCountries = ref<string[]>([])
+let miniMap: any = null
+
+async function initMiniMap() {
+  if (!miniMapRef.value) return
+  try { visitedCountries.value = await $fetch('/api/visited') } catch { visitedCountries.value = [] }
+
+  const L = (await import('leaflet')).default
+  miniMap = L.map(miniMapRef.value, { center: [25, 0], zoom: 1.5, zoomControl: false, attributionControl: false, scrollWheelZoom: false, dragging: true })
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(miniMap)
+
+  try {
+    const resp = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+    const geoJson = await resp.json()
+    const visitedCount = visitedCountries.value.map((v: any) => v.country_name)
+    // Get English names of visited countries
+    const countries = await $fetch('/api/countries')
+    const visitedEn = countries.filter((c: any) => visitedCount.includes(c.name)).map((c: any) => c.en)
+    
+    L.geoJSON(geoJson, {
+      style: (feature: any) => {
+        const name = feature?.properties?.name
+        if (!visitedEn.includes(name)) return { fillOpacity: 0, color: 'transparent', weight: 0 }
+        // Determine color by who visited
+        const vc = visitedCountries.value.find((v: any) => v.country_name === countries.find((c: any) => c.en === name)?.name)
+        const by = vc?.visited_by || 'both'
+        const color = by === 'aksel' ? '#4da6ff' : by === 'amandine' ? '#ff6b8a' : '#F5A623'
+        return { fillColor: color, fillOpacity: 0.4, color, weight: 1, opacity: 0.8 }
+      },
+      onEachFeature: (_feature: any, layer: any) => {
+        layer.on('click', () => navigateTo('/carte'))
+      },
+    }).addTo(miniMap)
+  } catch {}
+
+  setTimeout(() => miniMap?.invalidateSize(), 300)
+}
 
 const todos = ref<any[]>([])
 const events = ref<any[]>([])
@@ -34,6 +78,8 @@ onMounted(async () => {
   loading.value = false
   await nextTick()
 
+  initMiniMap()
+
   ctx = gsap.context(() => {
     gsap.registerPlugin(ScrollTrigger)
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
@@ -46,7 +92,7 @@ onMounted(async () => {
   })
 })
 
-onUnmounted(() => { ctx?.revert(); ScrollTrigger.getAll().forEach(t => t.kill()) })
+onUnmounted(() => { ctx?.revert(); ScrollTrigger.getAll().forEach(t => t.kill()); if (miniMap) miniMap.remove() })
 
 const pendingTodos = computed(() => todos.value.filter((t: any) => t.status !== 'done'))
 const dreamCount = computed(() => todos.value.filter((t: any) => t.priority === 'dream').length)
@@ -189,7 +235,16 @@ function spinRoulette() {
       </div>
     </div>
 
-    <!-- Compte à rebours -->
+    <!-- Mini Carte du Monde -->
+    <div class="mb-6 bg-surface border border-border rounded-2xl overflow-hidden">
+      <div class="flex items-center justify-between px-5 pt-5 pb-0">
+        <p class="text-sm font-bold flex items-center gap-2"><Icon icon="lucide:globe" class="w-4 h-4 text-gold" /> Carte du monde</p>
+        <NuxtLink to="/carte" class="text-xs text-gold hover:text-gold-soft transition-colors flex items-center gap-1">
+          Explorer <Icon icon="lucide:arrow-right" class="w-3 h-3" />
+        </NuxtLink>
+      </div>
+      <div ref="miniMapRef" class="w-full h-[200px] sm:h-[250px]" />
+    </div>
     <div v-if="nextBigEvent" class="mb-6 bg-surface border border-border rounded-2xl p-5 flex items-center gap-4 overflow-hidden relative">
       <div class="absolute inset-0 bg-gradient-to-r from-rose/5 via-transparent to-lavender/5" />
       <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 z-10" :style="{ background: (nextBigEvent.color || '#a78bfa') + '20' }">
