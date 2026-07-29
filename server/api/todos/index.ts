@@ -2,6 +2,8 @@ import { query } from '../../utils/db'
 
 // GET all todos
 export default defineEventHandler(async (e) => {
+  const account = e.context.account
+  if (!account) throw createError({ statusCode: 401, message: 'Not authenticated' })
   const method = e.method
   
   if (method === 'GET') {
@@ -13,12 +15,12 @@ export default defineEventHandler(async (e) => {
         u_assign.name as assignee_name, u_assign.color as assignee_color
       FROM todos t
       LEFT JOIN todo_categories tc ON t.category_id = tc.id
-      LEFT JOIN users u_creator ON t.created_by = u_creator.id
-      LEFT JOIN users u_assign ON t.assigned_to = u_assign.id
-      WHERE 1=1
+      LEFT JOIN accounts u_creator ON t.created_by = u_creator.id
+      LEFT JOIN accounts u_assign ON t.assigned_to = u_assign.id
+      WHERE t.partnership_id = $1
     `
-    const params: any[] = []
-    let i = 1
+    const params: any[] = [account.partnership_id]
+    let i = 2
     
     if (category) { sql += ` AND tc.name = $${i++}`; params.push(category) }
     if (status) { sql += ` AND t.status = $${i++}`; params.push(status) }
@@ -33,12 +35,12 @@ export default defineEventHandler(async (e) => {
   // POST create todo
   if (method === 'POST') {
     const body = await readBody(e)
-    const { title, description, category_id, created_by, assigned_to, priority, status } = body
+    const { title, description, category_id, assigned_to, priority, status } = body
     
     const result = await query(
-      `INSERT INTO todos (title, description, category_id, created_by, assigned_to, priority, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [title, description || '', category_id || null, created_by || 1, assigned_to || null, priority || 'medium', status || 'todo']
+      `INSERT INTO todos (title, description, category_id, created_by, assigned_to, priority, status, partnership_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [title, description || '', category_id || null, account.id, assigned_to || null, priority || 'medium', status || 'todo', account.partnership_id]
     )
     return result.rows[0]
   }

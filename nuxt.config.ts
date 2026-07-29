@@ -18,7 +18,7 @@ export default defineNuxtConfig({
   },
   app: {
     head: {
-      title: 'Nous Deux — Aksel & Amandine',
+      title: 'Nous Deux',
       meta: [
         { charset: 'utf-8' },
         { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },

@@ -9,6 +9,17 @@ useHead({
 })
 
 const { fetchTodos, fetchEvents, fetchUsers, createTodo, createEvent, setupDb } = useApi()
+const { account } = useAuth()
+
+const subtitle = computed(() => {
+  if (!account.value) return 'Chargement...'
+  if (account.value.partner) return `${account.value.name} & ${account.value.partner.name} — projets, rêves et moments partagés`
+  return `${account.value.name} — en attente de ton/ta partenaire`
+})
+
+// Partner ID helpers
+const myId = computed(() => account.value?.id)
+const partnerId = computed(() => account.value?.partner?.id || null)
 
 // Mini map
 const miniMapRef = ref<HTMLElement | null>(null)
@@ -80,6 +91,8 @@ onMounted(async () => {
 
   initMiniMap()
 
+  loadDashboardMoods()
+
   ctx = gsap.context(() => {
     gsap.registerPlugin(ScrollTrigger)
     const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
@@ -127,7 +140,7 @@ async function onSubmitQuickTodo() {
     description: fd.get('description'),
     category_id: parseInt(fd.get('category_id') as string) || 1,
     priority: fd.get('priority') || 'medium',
-    assigned_to: fd.get('assigned_to') === 'amandine' ? 2 : 1,
+    assigned_to: fd.get('assigned_to') === 'partner' ? partnerId.value : myId.value,
     status: 'todo'
   })
   showQuickTodo.value = false
@@ -150,7 +163,7 @@ async function onSubmitQuickEvent() {
     end_time: hasEnd ? endDate + 'T23:59:59.000Z' : null,
     all_day: true,
     color: colors[quickEventType.value] || '#a78bfa',
-    created_by: 2,
+    created_by: myId.value,
   })
   showQuickEvent.value = false
   const e = await fetchEvents()
@@ -186,6 +199,18 @@ const countdown = computed(() => {
 const randomIdea = ref<any>(null)
 const allIdeas = computed(() => todos.value.filter((t: any) => t.category_name === 'À faire' && t.status === 'todo'))
 
+// Mood
+const todayMoods = ref<any[]>([])
+
+async function loadDashboardMoods() {
+  try { todayMoods.value = await $fetch('/api/moods') } catch { todayMoods.value = [] }
+}
+
+async function quickSetMood(mood: string) {
+  await $fetch('/api/moods', { method: 'POST', body: { mood } })
+  await loadDashboardMoods()
+}
+
 function spinRoulette() {
   const ideas = allIdeas.value
   if (ideas.length === 0) return
@@ -204,7 +229,7 @@ function spinRoulette() {
       <h1 class="text-3xl sm:text-4xl font-bold mb-2">
         <span class="bg-gradient-to-r from-rose via-gold to-lavender bg-clip-text text-transparent">Nous Deux</span>
       </h1>
-      <p class="text-text-muted text-sm sm:text-base">Aksel & Amandine — projets, rêves et moments partagés</p>
+      <p class="text-text-muted text-sm sm:text-base">{{ subtitle }}</p>
     </div>
 
     <!-- Quick Actions — Amandine -->
@@ -258,6 +283,24 @@ function spinRoulette() {
           <span v-else class="text-mint font-bold">Aujourd'hui !</span>
           — {{ formatDate(nextBigEvent.start_time) }}
         </p>
+      </div>
+    </div>
+
+    <!-- Mood du jour -->
+    <div class="mb-6 bg-surface border border-border rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-4">
+        <p class="text-sm font-bold flex items-center gap-2"><Icon icon="lucide:smile" class="w-4 h-4 text-gold" /> Mood du jour</p>
+        <NuxtLink to="/moments" class="text-xs text-gold hover:text-gold-soft transition-colors">Voir plus →</NuxtLink>
+      </div>
+      <div v-if="todayMoods.length === 0" class="text-center py-4">
+        <p class="text-text-muted text-sm">Pas encore de mood aujourd'hui</p>
+        <button @click="quickSetMood('😊')" class="mt-2 px-4 py-1.5 rounded-lg bg-surface2 border border-border text-sm hover:border-gold/30 transition-colors">Enregistrer mon mood</button>
+      </div>
+      <div v-else class="flex items-center justify-center gap-8">
+        <div v-for="m in todayMoods" :key="m.account_id" class="text-center">
+          <div class="text-3xl mb-1">{{ m.mood }}</div>
+          <p class="text-xs font-medium" :style="{ color: m.color }">{{ m.name }}</p>
+        </div>
       </div>
     </div>
 

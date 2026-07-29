@@ -1,7 +1,9 @@
 import { query } from '../../utils/db'
 
-// GET single todo
+// GET/PATCH/DELETE single todo
 export default defineEventHandler(async (e) => {
+  const account = e.context.account
+  if (!account) throw createError({ statusCode: 401, message: 'Not authenticated' })
   const id = getRouterParam(e, 'id')
   const method = e.method
 
@@ -12,10 +14,10 @@ export default defineEventHandler(async (e) => {
         u_creator.name as creator_name, u_assign.name as assignee_name
       FROM todos t
       LEFT JOIN todo_categories tc ON t.category_id = tc.id
-      LEFT JOIN users u_creator ON t.created_by = u_creator.id
-      LEFT JOIN users u_assign ON t.assigned_to = u_assign.id
-      WHERE t.id = $1`,
-      [id]
+      LEFT JOIN accounts u_creator ON t.created_by = u_creator.id
+      LEFT JOIN accounts u_assign ON t.assigned_to = u_assign.id
+      WHERE t.id = $1 AND t.partnership_id = $2`,
+      [id, account.partnership_id]
     )
     if (result.rows.length === 0) throw createError({ statusCode: 404, message: 'Todo not found' })
     return result.rows[0]
@@ -41,17 +43,20 @@ export default defineEventHandler(async (e) => {
     fields.push(`updated_at = $${i++}`)
     params.push(new Date().toISOString())
     params.push(id)
+    params.push(account.partnership_id)
 
     const result = await query(
-      `UPDATE todos SET ${fields.join(', ')} WHERE id = $${i} RETURNING *`,
+      `UPDATE todos SET ${fields.join(', ')} WHERE id = $${i++} AND partnership_id = $${i++} RETURNING *`,
       params
     )
+    if (result.rows.length === 0) throw createError({ statusCode: 404, message: 'Todo not found' })
     return result.rows[0]
   }
 
   // DELETE todo
   if (method === 'DELETE') {
-    await query('DELETE FROM todos WHERE id = $1', [id])
+    const result = await query('DELETE FROM todos WHERE id = $1 AND partnership_id = $2', [id, account.partnership_id])
+    if (result.rowCount === 0) throw createError({ statusCode: 404, message: 'Todo not found' })
     return { success: true }
   }
 })

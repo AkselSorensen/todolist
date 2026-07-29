@@ -9,10 +9,6 @@
           <span class="text-base sm:text-lg font-bold text-text">Nous Deux</span>
         </NuxtLink>
         <div class="flex items-center gap-1 sm:gap-2">
-          <button v-if="deferredPrompt" @click="showInstallModal = true"
-            class="px-2.5 sm:px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose to-lavender text-white text-[10px] sm:text-xs font-semibold hover:scale-105 transition-transform flex items-center gap-1">
-            <Icon icon="lucide:download" class="w-3 h-3" /> <span class="hidden sm:inline">Installer</span>
-          </button>
           <NuxtLink to="/todos" class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
             :class="$route.path === '/todos' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
             <Icon icon="lucide:list-todo" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden xs:inline">Tâches</span>
@@ -25,6 +21,47 @@
             :class="$route.path === '/carte' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
             <Icon icon="lucide:globe" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden xs:inline">Carte</span>
           </NuxtLink>
+          <NuxtLink to="/moments" class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
+            :class="$route.path === '/moments' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
+            <Icon icon="lucide:sparkles" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden xs:inline">Moments</span>
+          </NuxtLink>
+
+          <!-- User dropdown -->
+          <div class="relative" ref="dropdownRef">
+            <button @click="showDropdown = !showDropdown"
+              class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl hover:bg-surface2 transition-colors">
+              <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+                :style="{ background: account?.color || '#a78bfa' }">
+                {{ account?.name?.charAt(0)?.toUpperCase() || '?' }}
+              </div>
+              <span class="hidden sm:inline text-sm text-text">{{ account?.name || '...' }}</span>
+              <Icon icon="lucide:chevron-down" class="w-3.5 h-3.5 text-text-muted hidden sm:block" />
+            </button>
+
+            <!-- Dropdown -->
+            <Transition name="fade">
+              <div v-if="showDropdown" class="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-50">
+                <div class="p-3 border-b border-border">
+                  <p class="text-sm font-semibold text-text">{{ account?.name }}</p>
+                  <p class="text-xs text-text-muted truncate">{{ account?.email }}</p>
+                </div>
+                <div class="p-1">
+                  <NuxtLink v-if="!account?.partner" to="/auth/onboarding"
+                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-surface2 transition-colors">
+                    <Icon icon="lucide:heart" class="w-4 h-4" /> Ajouter un partenaire
+                  </NuxtLink>
+                  <div v-else class="flex items-center gap-2 px-3 py-2 text-sm text-text-muted">
+                    <Icon icon="lucide:heart" class="w-4 h-4 text-rose" />
+                    <span>{{ account?.partner?.name || 'Partenaire' }}</span>
+                  </div>
+                  <button @click="handleLogout"
+                    class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-muted hover:text-rose hover:bg-surface2 transition-colors mt-1">
+                    <Icon icon="lucide:log-out" class="w-4 h-4" /> Déconnexion
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
         </div>
       </div>
     </nav>
@@ -59,13 +96,28 @@
 <script setup lang="ts">
 import { gsap } from 'gsap'
 
+const { account, logout } = useAuth()
 const navRef = ref<HTMLElement | null>(null)
+const dropdownRef = ref<HTMLElement | null>(null)
+const showDropdown = ref(false)
 const deferredPrompt = ref<any>(null)
 const showInstallModal = ref(false)
 
+async function handleLogout() {
+  showDropdown.value = false
+  await logout()
+}
+
+// Close dropdown on outside click
 onMounted(() => {
   nextTick(() => {
     gsap.to(navRef.value, { autoAlpha: 1, duration: 0.5, ease: 'power3.out', delay: 0.1 })
+  })
+
+  document.addEventListener('click', (e) => {
+    if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) {
+      showDropdown.value = false
+    }
   })
 
   if ('serviceWorker' in navigator) {
@@ -95,4 +147,6 @@ async function installPWA() {
 .modal-enter-active, .modal-leave-active { transition: all 0.25s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 .modal-enter-from > div:last-child, .modal-leave-to > div:last-child { transform: scale(0.92) translateY(10px); }
+.fade-enter-active, .fade-leave-active { transition: all 0.15s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
 </style>

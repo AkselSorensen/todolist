@@ -7,6 +7,14 @@ useHead({
   link: [{ rel: 'stylesheet', href: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' }]
 })
 
+const { account } = useAuth()
+const myName = computed(() => account.value?.name || 'Moi')
+const partnerName = computed(() => account.value?.partner?.name || 'Partenaire')
+const myColor = computed(() => account.value?.color || '#4da6ff')
+const partnerColor = computed(() => account.value?.partner?.color || '#ff6b8a')
+const myId = computed(() => account.value?.id)
+const partnerId = computed(() => account.value?.partner?.id)
+
 const allPlaces = ref<any[]>([])
 const visited = ref<any[]>([]) // { country_name, visited_by }
 
@@ -18,22 +26,22 @@ function isVisited(name: string) { return !!getVisitedBy(name) }
 function isWishlist(name: string) { return getVisitedBy(name) === 'wishlist' }
 
 // Scores
-const scoreAksel = computed(() => visited.value.filter((v: any) => v.visited_by === 'aksel').length)
-const scoreAmandine = computed(() => visited.value.filter((v: any) => v.visited_by === 'amandine').length)
+const scoreMoi = computed(() => visited.value.filter((v: any) => v.visited_by === String(myId.value)).length)
+const scorePartenaire = computed(() => visited.value.filter((v: any) => v.visited_by === String(partnerId.value)).length)
 const scoreBoth = computed(() => visited.value.filter((v: any) => v.visited_by === 'both').length)
 const scoreWishlist = computed(() => visited.value.filter((v: any) => v.visited_by === 'wishlist').length)
 function getVisitedColor(name: string) {
   const by = getVisitedBy(name)
-  if (by === 'aksel') return '#4da6ff'
-  if (by === 'amandine') return '#ff6b8a'
+  if (by === String(myId.value)) return myColor.value
+  if (by === String(partnerId.value)) return partnerColor.value
   if (by === 'both') return '#F5A623'
   if (by === 'wishlist') return '#a78bfa'
   return null
 }
 function getVisitedEmoji(name: string) {
   const by = getVisitedBy(name)
-  if (by === 'aksel') return '🧑‍💻'
-  if (by === 'amandine') return '👩‍🎨'
+  if (by === String(myId.value)) return '🧑'
+  if (by === String(partnerId.value)) return '👩'
   if (by === 'both') return '💞'
   if (by === 'wishlist') return '💭'
   return null
@@ -73,7 +81,7 @@ async function saveVisit(countryName: string, visitedBy: string | null) {
   } catch {}
 }
 
-const visitedByLabel: Record<string, string> = { aksel: '🧑‍💻 Aksel', amandine: '👩‍🎨 Amandine', both: '💞 Les deux' }
+const visitedByLabel: Record<string, string> = { [String(myId.value)]: `🧑 ${myName.value}`, [String(partnerId.value)]: `👩 ${partnerName.value}`, both: '💞 Les deux' }
 
 // Map
 const mapContainer = ref<HTMLElement | null>(null)
@@ -162,8 +170,8 @@ const wishlistCountries = computed(() => allPlaces.value.filter((p: any) => getV
       </h1>
       <p class="text-text-muted text-sm">{{ visited.length }} pays visités · {{ allPlaces.length - visited.length }} à découvrir</p>
       <div class="flex items-center justify-center gap-4 mt-2">
-        <span class="text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">🧑‍💻 Aksel: {{ scoreAksel }}</span>
-        <span class="text-xs px-3 py-1 rounded-full bg-rose-500/10 text-rose border border-rose-500/20">👩‍🎨 Amandine: {{ scoreAmandine }}</span>
+        <span class="text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">🧑 {{ myName }}: {{ scoreMoi }}</span>
+        <span class="text-xs px-3 py-1 rounded-full bg-rose-500/10 text-rose border border-rose-500/20">👩 {{ partnerName }}: {{ scorePartenaire }}</span>
         <span class="text-xs px-3 py-1 rounded-full bg-gold/10 text-gold border border-gold/20">💞 Ensemble: {{ scoreBoth }}</span>
         <span class="text-xs px-3 py-1 rounded-full bg-lavender/10 text-lavender border border-lavender/20">💭 Rêves: {{ scoreWishlist }}</span>
       </div>
@@ -254,15 +262,15 @@ const wishlistCountries = computed(() => allPlaces.value.filter((p: any) => getV
             <div class="mb-5">
               <p class="text-xs font-semibold text-text-muted uppercase mb-2">Qui a visité ?</p>
               <div class="grid grid-cols-3 gap-2">
-                <button @click="saveVisit(selectedCountry.name, 'aksel')"
+                <button @click="saveVisit(selectedCountry.name, String(myId))"
                   class="py-3 rounded-xl text-sm font-medium transition-all border"
-                  :class="getVisitedBy(selectedCountry.name) === 'aksel' ? 'bg-rose/15 border-rose/30 text-rose' : 'border-border text-text-muted hover:border-rose/30 hover:text-rose'">
-                  🧑‍💻 Aksel
+                  :class="getVisitedBy(selectedCountry.name) === String(myId) ? 'bg-rose/15 border-rose/30 text-rose' : 'border-border text-text-muted hover:border-rose/30 hover:text-rose'">
+                  🧑 {{ myName }}
                 </button>
-                <button @click="saveVisit(selectedCountry.name, 'amandine')"
+                <button @click="saveVisit(selectedCountry.name, String(partnerId))"
                   class="py-3 rounded-xl text-sm font-medium transition-all border"
-                  :class="getVisitedBy(selectedCountry.name) === 'amandine' ? 'bg-lavender/15 border-lavender/30 text-lavender' : 'border-border text-text-muted hover:border-lavender/30 hover:text-lavender'">
-                  👩‍🎨 Amandine
+                  :class="getVisitedBy(selectedCountry.name) === String(partnerId) ? 'bg-lavender/15 border-lavender/30 text-lavender' : 'border-border text-text-muted hover:border-lavender/30 hover:text-lavender'">
+                  👩 {{ partnerName }}
                 </button>
                 <button @click="saveVisit(selectedCountry.name, 'both')"
                   class="py-3 rounded-xl text-sm font-medium transition-all border"

@@ -1,6 +1,8 @@
 import { query } from '../../utils/db'
 
 export default defineEventHandler(async (e) => {
+  const account = e.context.account
+  if (!account) throw createError({ statusCode: 401, message: 'Not authenticated' })
   const method = e.method
 
   try {
@@ -9,11 +11,11 @@ export default defineEventHandler(async (e) => {
       let sql = `
         SELECT ce.*, u.name as creator_name, u.color as creator_color
         FROM calendar_events ce
-        LEFT JOIN users u ON ce.created_by = u.id
-        WHERE 1=1
+        LEFT JOIN accounts u ON ce.created_by = u.id
+        WHERE ce.partnership_id = $1
       `
-      const params: any[] = []
-      let i = 1
+      const params: any[] = [account.partnership_id]
+      let i = 2
 
       if (from) { sql += ` AND ce.start_time >= $${i++}`; params.push(from) }
       if (to) { sql += ` AND ce.start_time <= $${i++}`; params.push(to) }
@@ -26,16 +28,14 @@ export default defineEventHandler(async (e) => {
 
     if (method === 'POST') {
       const body = await readBody(e)
-      // Allow 'trip' to map to 'event' if the constraint hasn't been updated yet
       let eventType = body.event_type || 'event'
-      // Temporarily map 'trip' to 'event' to avoid constraint issues
       if (eventType === 'trip') eventType = 'event'
 
       const result = await query(
-        `INSERT INTO calendar_events (title, description, event_type, start_time, end_time, all_day, created_by, alert_before, color, location)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+        `INSERT INTO calendar_events (title, description, event_type, start_time, end_time, all_day, created_by, alert_before, color, location, partnership_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [body.title, body.description || '', eventType, body.start_time, body.end_time || null, body.all_day || false,
-         body.created_by || 1, body.alert_before || 0, body.color || '#a78bfa', body.location || '']
+         account.id, body.alert_before || 0, body.color || '#a78bfa', body.location || '', account.partnership_id]
       )
       return result.rows[0]
     }
@@ -43,7 +43,7 @@ export default defineEventHandler(async (e) => {
     if (method === 'DELETE') {
       const { id } = getQuery(e)
       if (!id) throw createError({ statusCode: 400, message: 'Missing id' })
-      await query('DELETE FROM calendar_events WHERE id = $1', [id])
+      await query('DELETE FROM calendar_events WHERE id = $1 AND partnership_id = $2', [id, account.partnership_id])
       return { success: true }
     }
   } catch (err: any) {

@@ -1,7 +1,39 @@
 import { query } from '../utils/db'
 
 export default defineEventHandler(async () => {
-  // Users table
+  // Partnerships table
+  await query(`
+    CREATE TABLE IF NOT EXISTS partnerships (
+      id SERIAL PRIMARY KEY,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  // Accounts (auth)
+  await query(`
+    CREATE TABLE IF NOT EXISTS accounts (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#ff6b8a',
+      partner_id INT REFERENCES accounts(id),
+      partnership_id INT REFERENCES partnerships(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  // Refresh tokens
+  await query(`
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id SERIAL PRIMARY KEY,
+      account_id INT REFERENCES accounts(id) NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMPTZ NOT NULL
+    )
+  `)
+
+  // Users table (legacy, kept for backward compat during migration)
   await query(`
     CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
@@ -60,6 +92,12 @@ export default defineEventHandler(async () => {
   // Fix event_type constraint for existing DBs (add 'trip')
   await query(`ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_event_type_check`)
   await query(`ALTER TABLE calendar_events ADD CONSTRAINT calendar_events_event_type_check CHECK (event_type IN ('event', 'availability', 'reminder', 'date_night', 'trip'))`)
+
+  // Add partnership_id to existing tables (migration)
+  await query(`ALTER TABLE visited_countries ADD COLUMN IF NOT EXISTS partnership_id INT REFERENCES partnerships(id)`)
+  await query(`ALTER TABLE todos ADD COLUMN IF NOT EXISTS partnership_id INT REFERENCES partnerships(id)`)
+  await query(`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS partnership_id INT REFERENCES partnerships(id)`)
+  await query(`ALTER TABLE todo_categories ADD COLUMN IF NOT EXISTS partnership_id INT REFERENCES partnerships(id)`)
 
   // Visited countries table
   await query(`
@@ -147,10 +185,79 @@ export default defineEventHandler(async () => {
     await query('UPDATE countries SET attractions = $1 WHERE name = $2 AND (attractions IS NULL OR attractions = \'\')', [attr, name])
   }
 
-  const existingUsers = await query('SELECT COUNT(*) as c FROM users')
-  if (parseInt(existingUsers.rows[0].c) === 0) {
-    await query(`INSERT INTO users (name, color) VALUES ('Aksel', '#ff6b8a'), ('Amandine', '#a78bfa')`)
-    
+  // Date spots (restos, bars, lieux à tester)
+  await query(`
+    CREATE TABLE IF NOT EXISTS date_spots (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'restaurant',
+      rating INT CHECK (rating >= 1 AND rating <= 5),
+      notes TEXT DEFAULT '',
+      visited BOOLEAN DEFAULT false,
+      lat REAL,
+      lng REAL,
+      created_by INT REFERENCES accounts(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  // Memory timeline
+  await query(`
+    CREATE TABLE IF NOT EXISTS memories (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      title TEXT NOT NULL,
+      date DATE NOT NULL,
+      description TEXT DEFAULT '',
+      created_by INT REFERENCES accounts(id),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  // Love notes (petits messages)
+  await query(`
+    CREATE TABLE IF NOT EXISTS love_notes (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      from_id INT REFERENCES accounts(id),
+      to_id INT REFERENCES accounts(id),
+      message TEXT NOT NULL,
+      read BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  // Gift ideas
+  await query(`
+    CREATE TABLE IF NOT EXISTS gift_ideas (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      created_by INT REFERENCES accounts(id),
+      title TEXT NOT NULL,
+      link TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      surprise BOOLEAN DEFAULT false,
+      revealed_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  // Daily moods
+  await query(`
+    CREATE TABLE IF NOT EXISTS daily_moods (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      account_id INT REFERENCES accounts(id),
+      mood TEXT NOT NULL DEFAULT '😊',
+      date DATE NOT NULL DEFAULT CURRENT_DATE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(account_id, date)
+    )
+  `)
+
+  const existingCategories = await query('SELECT COUNT(*) as c FROM todo_categories')
+  if (parseInt(existingCategories.rows[0].c) === 0) {
     await query(`INSERT INTO todo_categories (name, icon, color, sort_order) VALUES 
       ('À faire', 'lucide:clipboard-list', '#f0c060', 1),
       ('En cours', 'lucide:zap', '#4adec0', 2),
