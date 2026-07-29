@@ -148,6 +148,10 @@ function updateMarkers() {
 }
 
 function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 0.8 }); openCountryModal(p) }
+
+// Wishlist panel
+const showWishlist = ref(true)
+const wishlistCountries = computed(() => allPlaces.value.filter((p: any) => getVisitedBy(p.name) === 'wishlist'))
 </script>
 
 <template>
@@ -193,6 +197,34 @@ function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 
       </div>
     </div>
     <p v-if="filteredPlaces.length === 0" class="text-center py-8 text-text-muted">Aucun pays trouvé</p>
+
+    <!-- Wishlist Side Panel -->
+    <Transition name="slide">
+      <div v-if="showWishlist && wishlistCountries.length > 0" class="fixed right-4 top-24 z-40 w-64 max-h-[70vh] bg-surface border border-lavender/30 rounded-2xl shadow-2xl overflow-hidden">
+        <div class="flex items-center justify-between p-4 border-b border-border bg-lavender/5">
+          <p class="text-sm font-bold flex items-center gap-2"><Icon icon="lucide:sparkles" class="w-4 h-4 text-lavender" /> 💭 Wishlist</p>
+          <button @click="showWishlist = false" class="text-text-muted hover:text-text transition-colors">
+            <Icon icon="lucide:x" class="w-4 h-4" />
+          </button>
+        </div>
+        <div class="overflow-y-auto max-h-[calc(70vh-56px)] p-2 space-y-1">
+          <div v-for="p in wishlistCountries" :key="p.name"
+            @click="flyToPlace(p)"
+            class="flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-surface2 transition-colors text-sm">
+            <span>{{ p.emoji }}</span>
+            <span class="text-text truncate flex-1">{{ p.name }}</span>
+            <button @click.stop="saveVisit(p.name, null)" class="text-text-muted hover:text-rose text-xs">✕</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Wishlist toggle -->
+    <button v-if="!showWishlist && wishlistCountries.length > 0" @click="showWishlist = true"
+      class="fixed right-4 top-24 z-40 w-12 h-12 rounded-full bg-lavender/20 border border-lavender/30 text-lavender flex items-center justify-center hover:scale-110 transition-transform shadow-lg">
+      <Icon icon="lucide:sparkles" class="w-5 h-5" />
+      <span class="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-lavender text-white text-[10px] font-bold flex items-center justify-center">{{ wishlistCountries.length }}</span>
+    </button>
 
     <!-- Country Modal -->
     <Teleport to="body">
@@ -269,4 +301,6 @@ function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 
 .modal-enter-active, .modal-leave-active { transition: all 0.25s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 .modal-enter-from > div:last-child, .modal-leave-to > div:last-child { transform: scale(0.95) translateY(10px); }
+.slide-enter-active, .slide-leave-active { transition: all 0.3s ease; }
+.slide-enter-from, .slide-leave-to { opacity: 0; transform: translateX(20px); }
 </style>
