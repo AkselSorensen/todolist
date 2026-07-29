@@ -15,6 +15,20 @@ async function loadVisited() { try { visited.value = await $fetch('/api/visited'
 
 function getVisitedBy(name: string) { return visited.value.find((v: any) => v.country_name === name)?.visited_by || null }
 function isVisited(name: string) { return !!getVisitedBy(name) }
+function getVisitedColor(name: string) {
+  const by = getVisitedBy(name)
+  if (by === 'aksel') return '#4da6ff'   // blue
+  if (by === 'amandine') return '#ff6b8a' // rose
+  if (by === 'both') return '#F5A623'      // orange
+  return null
+}
+function getVisitedEmoji(name: string) {
+  const by = getVisitedBy(name)
+  if (by === 'aksel') return '🧑‍💻'
+  if (by === 'amandine') return '👩‍🎨'
+  if (by === 'both') return '💞'
+  return null
+}
 
 const search = ref('')
 const continentFilter = ref('')
@@ -100,11 +114,13 @@ onMounted(async () => {
 
 function updateGeoJSON() {
   if (!geoJsonLayer) return
-  const visitedNames = allPlaces.value.filter((p: any) => isVisited(p.name)).map((p: any) => p.en)
   geoJsonLayer.setStyle((feature: any) => {
-    const name = feature?.properties?.name
-    return visitedNames.includes(name)
-      ? { fillColor: '#F5A623', fillOpacity: 0.35, color: '#F5A623', weight: 1.5, opacity: 0.8 }
+    const enName = feature?.properties?.name
+    const place = allPlaces.value.find((p: any) => p.en === enName)
+    if (!place) return { fillOpacity: 0, color: 'transparent', weight: 0 }
+    const color = getVisitedColor(place.name)
+    return color
+      ? { fillColor: color, fillOpacity: 0.35, color, weight: 1.5, opacity: 0.8 }
       : { fillOpacity: 0, color: 'transparent', weight: 0 }
   })
 }
@@ -158,7 +174,7 @@ function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 
         @click="flyToPlace(p)">
         <span class="text-xl flex-shrink-0" :class="isVisited(p.name) ? '' : 'opacity-40 grayscale'">{{ p.emoji }}</span>
         <span class="text-sm font-medium text-text truncate flex-1">{{ p.name }}</span>
-        <span v-if="getVisitedBy(p.name)" class="text-xs flex-shrink-0">{{ getVisitedBy(p.name) === 'aksel' ? '🧑‍💻' : getVisitedBy(p.name) === 'amandine' ? '👩‍🎨' : '💞' }}</span>
+        <span v-if="getVisitedEmoji(p.name)" class="text-xs flex-shrink-0">{{ getVisitedEmoji(p.name) }}</span>
       </div>
     </div>
     <p v-if="filteredPlaces.length === 0" class="text-center py-8 text-text-muted">Aucun pays trouvé</p>
