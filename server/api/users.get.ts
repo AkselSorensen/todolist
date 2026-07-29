@@ -1,14 +1,12 @@
 import { query } from '../utils/db'
+import { getCurrentAccount } from '../utils/auth'
 
 export default defineEventHandler(async (e) => {
-  const account = e.context.account
-  if (!account) throw createError({ statusCode: 401, message: 'Not authenticated' })
+  const account = await getCurrentAccount(e)
+  if (!account.partnership_id) throw createError({ statusCode: 400, message: 'No partner yet' })
 
   const result = await query(
-    `SELECT a.id, a.name, a.color, a.email
-     FROM accounts a
-     WHERE a.partnership_id = $1
-     ORDER BY a.id`,
+    'SELECT id, name, color, email FROM accounts WHERE partnership_id = $1 ORDER BY id',
     [account.partnership_id]
   )
   return result.rows
