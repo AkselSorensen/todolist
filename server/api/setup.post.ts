@@ -99,6 +99,15 @@ export default defineEventHandler(async () => {
   await query(`ALTER TABLE calendar_events ADD COLUMN IF NOT EXISTS partnership_id INT REFERENCES partnerships(id)`)
   await query(`ALTER TABLE todo_categories ADD COLUMN IF NOT EXISTS partnership_id INT REFERENCES partnerships(id)`)
 
+  // Fix FKs: drop old references to users, recreate pointing to accounts
+  await query(`ALTER TABLE todos DROP CONSTRAINT IF EXISTS todos_created_by_fkey`)
+  await query(`ALTER TABLE todos DROP CONSTRAINT IF EXISTS todos_assigned_to_fkey`)
+  await query(`ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_created_by_fkey`)
+  // Add new FKs (ignore if already exist)
+  await query(`DO $$ BEGIN ALTER TABLE todos ADD CONSTRAINT todos_created_by_fkey FOREIGN KEY (created_by) REFERENCES accounts(id); EXCEPTION WHEN duplicate_object THEN NULL; END $$`)
+  await query(`DO $$ BEGIN ALTER TABLE todos ADD CONSTRAINT todos_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES accounts(id); EXCEPTION WHEN duplicate_object THEN NULL; END $$`)
+  await query(`DO $$ BEGIN ALTER TABLE calendar_events ADD CONSTRAINT calendar_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES accounts(id); EXCEPTION WHEN duplicate_object THEN NULL; END $$`)
+
   // Visited countries table
   await query(`
     CREATE TABLE IF NOT EXISTS visited_countries (
