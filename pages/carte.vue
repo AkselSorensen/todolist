@@ -15,6 +15,11 @@ async function loadVisited() { try { visited.value = await $fetch('/api/visited'
 
 function getVisitedBy(name: string) { return visited.value.find((v: any) => v.country_name === name)?.visited_by || null }
 function isVisited(name: string) { return !!getVisitedBy(name) }
+
+// Scores
+const scoreAksel = computed(() => visited.value.filter((v: any) => v.visited_by === 'aksel').length)
+const scoreAmandine = computed(() => visited.value.filter((v: any) => v.visited_by === 'amandine').length)
+const scoreBoth = computed(() => visited.value.filter((v: any) => v.visited_by === 'both').length)
 function getVisitedColor(name: string) {
   const by = getVisitedBy(name)
   if (by === 'aksel') return '#4da6ff'   // blue
@@ -148,6 +153,11 @@ function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 
         <Icon icon="lucide:globe" class="w-6 sm:w-7 h-6 sm:h-7 text-gold" /> Notre Carte
       </h1>
       <p class="text-text-muted text-sm">{{ visited.length }} pays visités · {{ allPlaces.length - visited.length }} à découvrir</p>
+      <div class="flex items-center justify-center gap-4 mt-2">
+        <span class="text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">🧑‍💻 Aksel: {{ scoreAksel }}</span>
+        <span class="text-xs px-3 py-1 rounded-full bg-rose-500/10 text-rose border border-rose-500/20">👩‍🎨 Amandine: {{ scoreAmandine }}</span>
+        <span class="text-xs px-3 py-1 rounded-full bg-gold/10 text-gold border border-gold/20">💞 Ensemble: {{ scoreBoth }}</span>
+      </div>
     </div>
 
     <div class="flex flex-col sm:flex-row gap-3 mb-4">
