@@ -2,6 +2,7 @@ import { query } from '../../utils/db'
 import { comparePassword, generateTokens, setAuthCookies, storeRefreshToken } from '../../utils/auth'
 
 async function ensureTables() {
+  await query(`CREATE TABLE IF NOT EXISTS partnerships (id SERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT NOW())`)
   await query(`
     CREATE TABLE IF NOT EXISTS accounts (
       id SERIAL PRIMARY KEY,
@@ -11,12 +12,6 @@ async function ensureTables() {
       color TEXT NOT NULL DEFAULT '#ff6b8a',
       partner_id INT REFERENCES accounts(id),
       partnership_id INT REFERENCES partnerships(id),
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `)
-  await query(`
-    CREATE TABLE IF NOT EXISTS partnerships (
-      id SERIAL PRIMARY KEY,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `)

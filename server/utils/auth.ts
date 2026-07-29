@@ -1,11 +1,10 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { setCookie, deleteCookie, getCookie } from 'h3'
 import { query } from './db'
 
 const ACCESS_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
-const REFRESH_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+const REFRESH_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000
 
 export interface AccountPayload {
   id: number
@@ -56,23 +55,25 @@ export async function consumeRefreshToken(token: string): Promise<number | null>
 }
 
 export function generateTokens(account: AccountPayload): { accessToken: string; refreshToken: string } {
-  const accessToken = generateAccessToken(account)
-  const refreshToken = generateRefreshToken()
-  return { accessToken, refreshToken }
+  return {
+    accessToken: generateAccessToken(account),
+    refreshToken: generateRefreshToken()
+  }
 }
 
 export function setAuthCookies(event: any, accessToken: string, refreshToken: string) {
-  const cookieOpts = {
+  const opts = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
     sameSite: 'lax' as const,
     path: '/',
   }
-  setCookie(event, 'auth_token', accessToken, { ...cookieOpts, maxAge: 15 * 60 })
-  setCookie(event, 'refresh_token', refreshToken, { ...cookieOpts, maxAge: 7 * 24 * 60 * 60 })
+  // Nitro/h3 auto-imports
+  setCookie(event, 'auth_token', accessToken, { ...opts, maxAge: 15 * 60 })
+  setCookie(event, 'refresh_token', refreshToken, { ...opts, maxAge: 7 * 24 * 60 * 60 })
 }
 
 export function clearAuthCookies(event: any) {
-  deleteCookie(event, 'auth_token')
-  deleteCookie(event, 'refresh_token')
+  deleteCookie(event, 'auth_token', { path: '/' })
+  deleteCookie(event, 'refresh_token', { path: '/' })
 }

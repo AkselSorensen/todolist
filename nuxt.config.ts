@@ -5,7 +5,8 @@ export default defineNuxtConfig({
   modules: [],
   css: ['~/assets/css/main.css'],
   nitro: {
-    preset: 'vercel'
+    preset: 'vercel',
+    externals: ['bcryptjs', 'jsonwebtoken']
   },
   vite: {
     plugins: [tailwindcss()]

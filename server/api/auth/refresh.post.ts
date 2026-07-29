@@ -1,14 +1,13 @@
-import { getCookie } from 'h3'
 import { verifyAccessToken, consumeRefreshToken, generateTokens, setAuthCookies, storeRefreshToken } from '../../utils/auth'
 import { query } from '../../utils/db'
 
 export default defineEventHandler(async (event) => {
-  const refreshToken = getCookie(event, 'refresh_token')
-  if (!refreshToken) {
+  const token = getCookie(event, 'refresh_token')
+  if (!token) {
     throw createError({ statusCode: 401, message: 'No refresh token' })
   }
 
-  const accountId = await consumeRefreshToken(refreshToken)
+  const accountId = await consumeRefreshToken(token)
   if (!accountId) {
     throw createError({ statusCode: 401, message: 'Invalid or expired refresh token' })
   }
@@ -24,11 +23,8 @@ export default defineEventHandler(async (event) => {
 
   const account = result.rows[0]
   const payload = {
-    id: account.id,
-    email: account.email,
-    name: account.name,
-    partnership_id: account.partnership_id,
-    partner_id: account.partner_id,
+    id: account.id, email: account.email, name: account.name,
+    partnership_id: account.partnership_id, partner_id: account.partner_id,
   }
 
   const tokens = generateTokens(payload)
