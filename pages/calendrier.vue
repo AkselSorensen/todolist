@@ -90,8 +90,9 @@ async function loadData() {
   loading.value = true
   const startDate = new Date(currentYear.value, currentMonth.value - 1, 1)
   const endDate = new Date(currentYear.value, currentMonth.value + 2, 0)
-  const [e, u] = await Promise.all([fetchEvents(startDate.toISOString(), endDate.toISOString()), fetchUsers()])
-  events.value = e || []; users.value = u || []
+  const [e, u] = await Promise.allSettled([fetchEvents(startDate.toISOString(), endDate.toISOString()), fetchUsers()])
+  events.value = e.status === 'fulfilled' ? (e.value || []) : []
+  users.value = u.status === 'fulfilled' ? (u.value || []) : []
   loading.value = false
   await nextTick()
   ctx?.revert()

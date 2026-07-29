@@ -84,8 +84,10 @@ let ctx: gsap.Context | null = null
 
 onMounted(async () => {
   try { await setupDb() } catch (e) { /* ok */ }
-  const [t, e, u] = await Promise.all([fetchTodos({ status: 'todo' }), fetchEvents(), fetchUsers()])
-  todos.value = t || []; events.value = e || []; users.value = u || []
+  const [t, e, u] = await Promise.allSettled([fetchTodos({ status: 'todo' }), fetchEvents(), fetchUsers()])
+  todos.value = t.status === 'fulfilled' ? (t.value || []) : []
+  events.value = e.status === 'fulfilled' ? (e.value || []) : []
+  users.value = u.status === 'fulfilled' ? (u.value || []) : []
   loading.value = false
   await nextTick()
 
