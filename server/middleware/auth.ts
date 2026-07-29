@@ -6,7 +6,7 @@ const PUBLIC_PATHS = [
   '/api/auth/refresh',
   '/api/setup',
   '/api/countries',
-  '/api/debug',
+  '/api/migrate',
 ]
 
 export default defineEventHandler(async (event) => {
