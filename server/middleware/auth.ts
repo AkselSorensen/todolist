@@ -5,15 +5,14 @@ const PUBLIC_PATHS = [
   '/api/auth/login',
   '/api/auth/refresh',
   '/api/setup',
-  '/api/countries',
 ]
 
 export default defineEventHandler(async (event) => {
   const path = event.path
   if (!path.startsWith('/api/')) return
   if (PUBLIC_PATHS.some(p => path.startsWith(p))) return
+  // Countries are public (map data)
   if (path === '/api/countries' && event.method === 'GET') return
-  if (path === '/api/users' && event.method === 'GET') return
 
   const token = getCookie(event, 'auth_token')
   if (!token) {
