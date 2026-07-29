@@ -1,3 +1,4 @@
+import { getCookie } from 'h3'
 import { verifyAccessToken } from '../utils/auth'
 
 const PUBLIC_PATHS = [

@@ -1,3 +1,4 @@
+import { getCookie } from 'h3'
 import { verifyAccessToken, consumeRefreshToken, generateTokens, setAuthCookies, storeRefreshToken } from '../../utils/auth'
 import { query } from '../../utils/db'
 

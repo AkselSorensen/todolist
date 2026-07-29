@@ -1,11 +1,10 @@
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { setCookie, deleteCookie, getCookie } from 'h3'
 import { query } from './db'
 
 const ACCESS_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me'
-const REFRESH_SECRET = (process.env.JWT_SECRET || 'dev-secret-change-me') + '-refresh'
-const ACCESS_EXPIRY = '15m'
 const REFRESH_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
 export interface AccountPayload {
@@ -25,7 +24,7 @@ export function comparePassword(password: string, hash: string): boolean {
 }
 
 export function generateAccessToken(payload: AccountPayload): string {
-  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: ACCESS_EXPIRY })
+  return jwt.sign(payload, ACCESS_SECRET, { expiresIn: '15m' })
 }
 
 export function generateRefreshToken(): string {
