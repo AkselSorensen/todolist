@@ -15,16 +15,19 @@ async function loadVisited() { try { visited.value = await $fetch('/api/visited'
 
 function getVisitedBy(name: string) { return visited.value.find((v: any) => v.country_name === name)?.visited_by || null }
 function isVisited(name: string) { return !!getVisitedBy(name) }
+function isWishlist(name: string) { return getVisitedBy(name) === 'wishlist' }
 
 // Scores
 const scoreAksel = computed(() => visited.value.filter((v: any) => v.visited_by === 'aksel').length)
 const scoreAmandine = computed(() => visited.value.filter((v: any) => v.visited_by === 'amandine').length)
 const scoreBoth = computed(() => visited.value.filter((v: any) => v.visited_by === 'both').length)
+const scoreWishlist = computed(() => visited.value.filter((v: any) => v.visited_by === 'wishlist').length)
 function getVisitedColor(name: string) {
   const by = getVisitedBy(name)
-  if (by === 'aksel') return '#4da6ff'   // blue
-  if (by === 'amandine') return '#ff6b8a' // rose
-  if (by === 'both') return '#F5A623'      // orange
+  if (by === 'aksel') return '#4da6ff'
+  if (by === 'amandine') return '#ff6b8a'
+  if (by === 'both') return '#F5A623'
+  if (by === 'wishlist') return '#a78bfa'
   return null
 }
 function getVisitedEmoji(name: string) {
@@ -32,6 +35,7 @@ function getVisitedEmoji(name: string) {
   if (by === 'aksel') return '🧑‍💻'
   if (by === 'amandine') return '👩‍🎨'
   if (by === 'both') return '💞'
+  if (by === 'wishlist') return '💭'
   return null
 }
 
@@ -157,6 +161,7 @@ function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 
         <span class="text-xs px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">🧑‍💻 Aksel: {{ scoreAksel }}</span>
         <span class="text-xs px-3 py-1 rounded-full bg-rose-500/10 text-rose border border-rose-500/20">👩‍🎨 Amandine: {{ scoreAmandine }}</span>
         <span class="text-xs px-3 py-1 rounded-full bg-gold/10 text-gold border border-gold/20">💞 Ensemble: {{ scoreBoth }}</span>
+        <span class="text-xs px-3 py-1 rounded-full bg-lavender/10 text-lavender border border-lavender/20">💭 Rêves: {{ scoreWishlist }}</span>
       </div>
     </div>
 
@@ -233,6 +238,15 @@ function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 
                   💞 Les deux
                 </button>
               </div>
+            </div>
+
+            <!-- Wishlist -->
+            <div class="mb-5">
+              <button @click="saveVisit(selectedCountry.name, 'wishlist')"
+                class="w-full py-3 rounded-xl text-sm font-medium transition-all border"
+                :class="isWishlist(selectedCountry.name) ? 'bg-lavender/15 border-lavender/30 text-lavender' : 'border-dashed border-border text-text-muted hover:border-lavender/30 hover:text-lavender'">
+                💭 À faire ensemble
+              </button>
             </div>
 
             <!-- Remove -->
