@@ -6,7 +6,6 @@ const PUBLIC_PATHS = [
   '/api/auth/refresh',
   '/api/setup',
   '/api/countries',
-  '/api/migrate',
 ]
 
 export default defineEventHandler(async (event) => {
@@ -16,7 +15,6 @@ export default defineEventHandler(async (event) => {
   if (path === '/api/countries' && event.method === 'GET') return
   if (path === '/api/users' && event.method === 'GET') return
 
-  // getCookie is auto-imported by Nitro/h3
   const token = getCookie(event, 'auth_token')
   if (!token) {
     throw createError({ statusCode: 401, message: 'Authentication required' })
