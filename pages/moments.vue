@@ -12,6 +12,7 @@ const tabs = [
   { id: 'timeline', icon: 'lucide:clock', label: 'Timeline' },
   { id: 'spots', icon: 'lucide:map-pin', label: 'Date Spots' },
   { id: 'gifts', icon: 'lucide:gift', label: 'Cadeaux' },
+  { id: 'trips', icon: 'lucide:plane', label: 'Voyages' },
 ]
 
 // ---- Mood ----
@@ -116,8 +117,31 @@ async function deleteGift(id: number) {
   await loadGifts()
 }
 
+// ---- Trips ----
+const trips = ref<any[]>([])
+const showTripForm = ref(false)
+const tripTitle = ref(''); const tripDest = ref(''); const tripDesc = ref(''); const tripStart = ref(''); const tripEnd = ref('')
+async function loadTrips() {
+  try { trips.value = await $fetch('/api/proposals') } catch { trips.value = [] }
+}
+async function addTrip() {
+  if (!tripTitle.value.trim()) return
+  await $fetch('/api/proposals', { method: 'POST', body: { title: tripTitle.value, destination: tripDest.value, description: tripDesc.value, start_date: tripStart.value || null, end_date: tripEnd.value || null } })
+  tripTitle.value = ''; tripDest.value = ''; tripDesc.value = ''; tripStart.value = ''; tripEnd.value = ''; showTripForm.value = false
+  await loadTrips()
+}
+async function respondTrip(id: number, status: string) {
+  await $fetch('/api/proposals', { method: 'PATCH', body: { id, status } })
+  await loadTrips()
+}
+async function deleteTrip(id: number) {
+  await $fetch(`/api/proposals?id=${id}`, { method: 'DELETE' })
+  await loadTrips()
+}
+function formatTripDate(d: string) { if (!d) return ''; return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) }
+
 onMounted(async () => {
-  await Promise.all([loadMoods(), loadNotes(), loadMemories(), loadSpots(), loadGifts()])
+  await Promise.all([loadMoods(), loadNotes(), loadMemories(), loadSpots(), loadGifts(), loadTrips()])
   nextTick(() => {
     gsap.fromTo('.moment-card', { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' })
   })
@@ -130,6 +154,7 @@ watch(activeTab, async (tab) => {
   if (tab === 'timeline') await loadMemories()
   if (tab === 'spots') await loadSpots()
   if (tab === 'gifts') await loadGifts()
+  if (tab === 'trips') await loadTrips()
   nextTick(() => {
     gsap.fromTo('.moment-card', { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' })
   })
@@ -390,6 +415,76 @@ watch(activeTab, async (tab) => {
               <a v-if="g.link" :href="g.link" target="_blank" class="text-xs text-lavender hover:text-lavender-soft mt-1 inline-block truncate">{{ g.link }}</a>
             </div>
             <button @click="deleteGift(g.id)" class="p-1.5 rounded-lg text-text-muted hover:text-rose hover:bg-surface2 transition-colors ml-2">
+              <Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========= TRIPS ========= -->
+    <div v-if="activeTab === 'trips'">
+      <div class="flex justify-between items-center mb-4">
+        <p class="text-sm text-text-muted">{{ trips.length }} proposition{{ trips.length > 1 ? 's' : '' }}</p>
+        <button @click="showTripForm = !showTripForm"
+          class="px-4 py-2 rounded-xl bg-gradient-to-r from-gold to-rose text-white text-sm font-semibold hover:scale-105 transition-transform flex items-center gap-1.5">
+          <Icon icon="lucide:plus" class="w-4 h-4" /> Proposer
+        </button>
+      </div>
+
+      <Transition name="fade">
+        <div v-if="showTripForm" class="moment-card bg-surface border border-border rounded-2xl p-4 mb-4 space-y-3">
+          <input v-model="tripTitle" placeholder="Titre (ex: Week-end à Amsterdam)" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-gold/50 transition-colors" />
+          <input v-model="tripDest" placeholder="Destination (optionnel)" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-text-muted mb-1">Du</label>
+              <input v-model="tripStart" type="date" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs text-text-muted mb-1">Au</label>
+              <input v-model="tripEnd" type="date" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none" />
+            </div>
+          </div>
+          <textarea v-model="tripDesc" rows="2" placeholder="Description, activités..." class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none resize-none" />
+          <div class="flex gap-3">
+            <button @click="showTripForm = false" class="flex-1 py-2 rounded-xl border border-border text-text-muted text-sm hover:bg-surface2">Annuler</button>
+            <button @click="addTrip" class="flex-1 py-2 rounded-xl bg-gradient-to-r from-gold to-rose text-white font-semibold text-sm">Proposer le voyage</button>
+          </div>
+        </div>
+      </Transition>
+
+      <div v-if="trips.length === 0" class="text-center py-8 text-text-muted">
+        <Icon icon="lucide:plane" class="w-10 h-10 mx-auto mb-2 opacity-40" />
+        <p>Pas encore de proposition de voyage</p>
+      </div>
+      <div v-else class="space-y-3">
+        <div v-for="t in trips" :key="t.id" class="moment-card bg-surface border rounded-2xl p-4 transition-all"
+          :class="t.status === 'accepted' ? 'border-mint/20 bg-mint/5' : t.status === 'declined' ? 'border-rose/20 bg-rose/5 opacity-60' : 'border-gold/20'">
+          <div class="flex items-start justify-between">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-1">
+                <Icon icon="lucide:plane" class="w-4 h-4" :class="t.status === 'accepted' ? 'text-mint' : t.status === 'declined' ? 'text-rose' : 'text-gold'" />
+                <p class="text-sm font-semibold">{{ t.title }}</p>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-medium"
+                  :class="t.status === 'accepted' ? 'bg-mint/10 text-mint' : t.status === 'declined' ? 'bg-rose/10 text-rose' : 'bg-gold/10 text-gold'">
+                  {{ t.status === 'accepted' ? '✅ Accepté' : t.status === 'declined' ? '❌ Décliné' : '⏳ En attente' }}
+                </span>
+              </div>
+              <p class="text-xs text-text-muted">Proposé par {{ t.from_name }}</p>
+              <div v-if="t.destination" class="flex items-center gap-1 text-xs text-lavender mt-1"><Icon icon="lucide:map-pin" class="w-3 h-3" />{{ t.destination }}</div>
+              <div v-if="t.start_date" class="text-xs text-text-muted mt-1">
+                {{ formatTripDate(t.start_date) }}<span v-if="t.end_date && t.end_date !== t.start_date"> → {{ formatTripDate(t.end_date) }}</span>
+              </div>
+              <p v-if="t.description" class="text-xs text-text-muted mt-1 line-clamp-2">{{ t.description }}</p>
+
+              <!-- Accept/Decline (only for receiver when pending) -->
+              <div v-if="t.status === 'pending' && t.from_id !== account?.id" class="flex gap-2 mt-3">
+                <button @click="respondTrip(t.id, 'accepted')" class="px-4 py-1.5 rounded-lg bg-mint/15 text-mint border border-mint/30 text-xs font-medium hover:bg-mint/20 transition-colors">✅ Accepter</button>
+                <button @click="respondTrip(t.id, 'declined')" class="px-4 py-1.5 rounded-lg bg-rose/15 text-rose border border-rose/30 text-xs font-medium hover:bg-rose/20 transition-colors">❌ Décliner</button>
+              </div>
+            </div>
+            <button @click="deleteTrip(t.id)" class="p-1.5 rounded-lg text-text-muted hover:text-rose hover:bg-surface2 transition-colors ml-2">
               <Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
             </button>
           </div>

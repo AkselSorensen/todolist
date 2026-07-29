@@ -26,6 +26,41 @@
             <Icon icon="lucide:sparkles" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden xs:inline">Moments</span>
           </NuxtLink>
 
+          <!-- Notification bell -->
+          <div class="relative" ref="notifRef">
+            <button @click="showNotifs = !showNotifs; if(showNotifs) markNotifsRead()"
+              class="relative p-2 rounded-xl hover:bg-surface2 transition-colors">
+              <Icon icon="lucide:bell" class="w-4 h-4 sm:w-5 sm:h-5" :class="unreadCount > 0 ? 'text-gold' : 'text-text-muted'" />
+              <span v-if="unreadCount > 0" class="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 rounded-full bg-rose text-white text-[10px] font-bold flex items-center justify-center leading-none">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
+            </button>
+
+            <!-- Notif dropdown -->
+            <Transition name="fade">
+              <div v-if="showNotifs" class="absolute right-0 top-full mt-2 w-80 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-50 max-h-[60vh] flex flex-col">
+                <div class="flex items-center justify-between p-3 border-b border-border">
+                  <p class="text-sm font-bold">Notifications</p>
+                  <button @click="markAllRead" v-if="unreadCount > 0" class="text-xs text-gold hover:text-gold-soft">Tout lu</button>
+                </div>
+                <div class="overflow-y-auto flex-1">
+                  <div v-if="notifications.length === 0" class="text-center py-8 text-text-muted text-sm">Aucune notification</div>
+                  <div v-for="n in notifications" :key="n.id"
+                    @click="goToNotif(n)"
+                    class="flex items-start gap-3 p-3 hover:bg-surface2 cursor-pointer transition-colors border-b border-border/50"
+                    :class="n.read ? '' : 'bg-rose/5'">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0" :style="{ background: (n.from_color || '#a78bfa') + '20' }">
+                      {{ n.from_name?.charAt(0) }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm text-text leading-snug">{{ n.message }}</p>
+                      <p class="text-[11px] text-text-muted mt-1">{{ timeAgo(n.created_at) }}</p>
+                    </div>
+                    <span v-if="!n.read" class="w-2 h-2 rounded-full bg-rose flex-shrink-0 mt-2" />
+                  </div>
+                </div>
+              </div>
+            </Transition>
+          </div>
+
           <!-- User dropdown -->
           <div class="relative" ref="dropdownRef">
             <button @click="showDropdown = !showDropdown"
@@ -99,9 +134,36 @@ import { gsap } from 'gsap'
 const { account, logout } = useAuth()
 const navRef = ref<HTMLElement | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
+const notifRef = ref<HTMLElement | null>(null)
 const showDropdown = ref(false)
+const showNotifs = ref(false)
+const notifications = ref<any[]>([])
+const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
 const deferredPrompt = ref<any>(null)
 const showInstallModal = ref(false)
+
+async function loadNotifications() {
+  try { notifications.value = await $fetch('/api/notifications') } catch { notifications.value = [] }
+}
+async function markAllRead() {
+  await $fetch('/api/notifications', { method: 'PATCH', body: { read_all: true } })
+  notifications.value.forEach(n => n.read = true)
+}
+function goToNotif(n: any) {
+  $fetch('/api/notifications', { method: 'PATCH', body: { id: n.id } })
+  n.read = true
+  showNotifs.value = false
+  if (n.link) navigateTo(n.link)
+}
+function timeAgo(date: string) {
+  const diff = Date.now() - new Date(date).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "À l'instant"
+  if (mins < 60) return `Il y a ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `Il y a ${hours}h`
+  return `Il y a ${Math.floor(hours / 24)}j`
+}
 
 async function handleLogout() {
   showDropdown.value = false
@@ -114,10 +176,12 @@ onMounted(() => {
     gsap.to(navRef.value, { autoAlpha: 1, duration: 0.5, ease: 'power3.out', delay: 0.1 })
   })
 
+  loadNotifications()
+  setInterval(loadNotifications, 60000) // poll every 60s
+
   document.addEventListener('click', (e) => {
-    if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) {
-      showDropdown.value = false
-    }
+    if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) showDropdown.value = false
+    if (notifRef.value && !notifRef.value.contains(e.target as Node)) showNotifs.value = false
   })
 
   if ('serviceWorker' in navigator) {

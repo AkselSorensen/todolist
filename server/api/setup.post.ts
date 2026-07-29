@@ -265,6 +265,37 @@ export default defineEventHandler(async () => {
     )
   `)
 
+  // Notifications
+  await query(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      from_id INT REFERENCES accounts(id),
+      to_id INT REFERENCES accounts(id),
+      type TEXT NOT NULL DEFAULT 'info',
+      message TEXT NOT NULL,
+      read BOOLEAN DEFAULT false,
+      link TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
+  // Trip proposals
+  await query(`
+    CREATE TABLE IF NOT EXISTS trip_proposals (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      from_id INT REFERENCES accounts(id),
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      destination TEXT DEFAULT '',
+      start_date DATE,
+      end_date DATE,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined')),
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
   const existingCategories = await query('SELECT COUNT(*) as c FROM todo_categories')
   if (parseInt(existingCategories.rows[0].c) === 0) {
     await query(`INSERT INTO todo_categories (name, icon, color, sort_order) VALUES 
