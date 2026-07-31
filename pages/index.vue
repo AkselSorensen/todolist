@@ -9,17 +9,13 @@ useHead({
 })
 
 const { fetchTodos, fetchEvents, fetchUsers, createTodo, createEvent, setupDb } = useApi()
-const { account } = useAuth()
 
-const subtitle = computed(() => {
-  if (!account.value) return 'Chargement...'
-  if (account.value.partner) return `${account.value.name} & ${account.value.partner.name} — projets, rêves et moments partagés`
-  return `${account.value.name} — en attente de ton/ta partenaire`
-})
+// Hardcoded
+const account = { id: 4, name: 'Aksel', color: '#4da6ff', partner: { id: 5, name: 'Amandine', color: '#ff6b8a' } }
 
-// Partner ID helpers
-const myId = computed(() => account.value?.id)
-const partnerId = computed(() => account.value?.partner?.id || null)
+const subtitle = computed(() => `${account.name} & ${account.partner.name} — projets, rêves et moments partagés`)
+const myId = computed(() => account.id)
+const partnerId = computed(() => account.partner?.id || null)
 
 // Mini map
 const miniMapRef = ref<HTMLElement | null>(null)

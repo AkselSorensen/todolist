@@ -3,7 +3,8 @@ import { gsap } from 'gsap'
 
 definePageMeta({ layout: 'default' })
 
-const { account } = useAuth()
+// Hardcoded
+const account = { id: 4, name: 'Aksel', color: '#4da6ff', partner: { id: 5, name: 'Amandine', color: '#ff6b8a' } }
 const activeTab = ref('mood')
 
 const tabs = [
@@ -23,7 +24,7 @@ const selectedMood = ref('')
 
 async function loadMoods() {
   try { todayMoods.value = await $fetch('/api/moods') } catch { todayMoods.value = [] }
-  const mine = todayMoods.value.find((m: any) => m.account_id === account.value?.id)
+  const mine = todayMoods.value.find((m: any) => m.account_id === account.id)
   selectedMood.value = mine?.mood || ''
 }
 async function setMood(mood: string) {

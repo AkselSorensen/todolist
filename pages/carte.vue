@@ -7,13 +7,14 @@ useHead({
   link: [{ rel: 'stylesheet', href: 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css' }]
 })
 
-const { account } = useAuth()
-const myName = computed(() => account.value?.name || 'Moi')
-const partnerName = computed(() => account.value?.partner?.name || 'Partenaire')
-const myColor = computed(() => account.value?.color || '#4da6ff')
-const partnerColor = computed(() => account.value?.partner?.color || '#ff6b8a')
-const myId = computed(() => account.value?.id)
-const partnerId = computed(() => account.value?.partner?.id)
+// Hardcoded
+const account = { id: 4, name: 'Aksel', color: '#4da6ff', partner: { id: 5, name: 'Amandine', color: '#ff6b8a' } }
+const myName = 'Aksel'
+const partnerName = 'Amandine'
+const myColor = '#4da6ff'
+const partnerColor = '#ff6b8a'
+const myId = 4
+const partnerId = 5
 
 const allPlaces = ref<any[]>([])
 const visited = ref<any[]>([]) // { country_name, visited_by }
@@ -26,22 +27,22 @@ function isVisited(name: string) { return !!getVisitedBy(name) }
 function isWishlist(name: string) { return getVisitedBy(name) === 'wishlist' }
 
 // Scores
-const scoreMoi = computed(() => visited.value.filter((v: any) => v.visited_by === String(myId.value)).length)
-const scorePartenaire = computed(() => visited.value.filter((v: any) => v.visited_by === String(partnerId.value)).length)
+const scoreMoi = computed(() => visited.value.filter((v: any) => v.visited_by === String(myId)).length)
+const scorePartenaire = computed(() => visited.value.filter((v: any) => v.visited_by === String(partnerId)).length)
 const scoreBoth = computed(() => visited.value.filter((v: any) => v.visited_by === 'both').length)
 const scoreWishlist = computed(() => visited.value.filter((v: any) => v.visited_by === 'wishlist').length)
 function getVisitedColor(name: string) {
   const by = getVisitedBy(name)
-  if (by === String(myId.value)) return myColor.value
-  if (by === String(partnerId.value)) return partnerColor.value
+  if (by === String(myId)) return myColor
+  if (by === String(partnerId)) return partnerColor
   if (by === 'both') return '#F5A623'
   if (by === 'wishlist') return '#a78bfa'
   return null
 }
 function getVisitedEmoji(name: string) {
   const by = getVisitedBy(name)
-  if (by === String(myId.value)) return '🧑'
-  if (by === String(partnerId.value)) return '👩'
+  if (by === String(myId)) return '🧑'
+  if (by === String(partnerId)) return '👩'
   if (by === 'both') return '💞'
   if (by === 'wishlist') return '💭'
   return null
@@ -81,7 +82,7 @@ async function saveVisit(countryName: string, visitedBy: string | null) {
   } catch {}
 }
 
-const visitedByLabel: Record<string, string> = { [String(myId.value)]: `🧑 ${myName.value}`, [String(partnerId.value)]: `👩 ${partnerName.value}`, both: '💞 Les deux' }
+const visitedByLabel: Record<string, string> = { [String(myId)]: `🧑 ${myName}`, [String(partnerId)]: `👩 ${partnerName}`, both: '💞 Les deux' }
 
 // Map
 const mapContainer = ref<HTMLElement | null>(null)

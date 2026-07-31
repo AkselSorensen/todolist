@@ -1,28 +1,18 @@
-import { verifyAccessToken } from '../utils/auth'
-
-const PUBLIC_PATHS = [
-  '/api/auth/register',
-  '/api/auth/login',
-  '/api/auth/refresh',
-  '/api/setup',
-]
-
+// Hardcoded auth for Aksel & Amandine — no login needed
 export default defineEventHandler(async (event) => {
   const path = event.path
   if (!path.startsWith('/api/')) return
-  if (PUBLIC_PATHS.some(p => path.startsWith(p))) return
-  // Countries are public (map data)
+
+  // Public paths (countries, setup)
   if (path === '/api/countries' && event.method === 'GET') return
+  if (path === '/api/setup') return
 
-  const token = getCookie(event, 'auth_token')
-  if (!token) {
-    throw createError({ statusCode: 401, message: 'Authentication required' })
+  // Hardcoded Aksel account
+  event.context.account = {
+    id: 4,
+    email: 'aksel@nousdeux.fr',
+    name: 'Aksel',
+    partnership_id: 1,
+    partner_id: 5,
   }
-
-  const payload = verifyAccessToken(token)
-  if (!payload) {
-    throw createError({ statusCode: 401, message: 'Invalid or expired token' })
-  }
-
-  event.context.account = payload
 })

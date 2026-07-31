@@ -61,41 +61,13 @@
             </Transition>
           </div>
 
-          <!-- User dropdown -->
-          <div class="relative" ref="dropdownRef">
-            <button @click="showDropdown = !showDropdown"
-              class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl hover:bg-surface2 transition-colors">
-              <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-                :style="{ background: account?.color || '#a78bfa' }">
-                {{ account?.name?.charAt(0)?.toUpperCase() || '?' }}
-              </div>
-              <span class="hidden sm:inline text-sm text-text">{{ account?.name || '...' }}</span>
-              <Icon icon="lucide:chevron-down" class="w-3.5 h-3.5 text-text-muted hidden sm:block" />
-            </button>
-
-            <!-- Dropdown -->
-            <Transition name="fade">
-              <div v-if="showDropdown" class="absolute right-0 top-full mt-2 w-56 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-50">
-                <div class="p-3 border-b border-border">
-                  <p class="text-sm font-semibold text-text">{{ account?.name }}</p>
-                  <p class="text-xs text-text-muted truncate">{{ account?.email }}</p>
-                </div>
-                <div class="p-1">
-                  <NuxtLink v-if="!account?.partner" to="/auth/onboarding"
-                    class="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-surface2 transition-colors">
-                    <Icon icon="lucide:heart" class="w-4 h-4" /> Ajouter un partenaire
-                  </NuxtLink>
-                  <div v-else class="flex items-center gap-2 px-3 py-2 text-sm text-text-muted">
-                    <Icon icon="lucide:heart" class="w-4 h-4 text-rose" />
-                    <span>{{ account?.partner?.name || 'Partenaire' }}</span>
-                  </div>
-                  <button @click="handleLogout"
-                    class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-text-muted hover:text-rose hover:bg-surface2 transition-colors mt-1">
-                    <Icon icon="lucide:log-out" class="w-4 h-4" /> Déconnexion
-                  </button>
-                </div>
-              </div>
-            </Transition>
+          <!-- Aksel & Amandine -->
+          <div class="flex items-center gap-1.5 px-2.5 py-1.5">
+            <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white" :style="{ background: account.color }">
+              {{ account.name.charAt(0) }}
+            </div>
+            <span class="hidden sm:inline text-sm text-text">{{ account.name }} & {{ account.partner.name }}</span>
+            <Icon icon="lucide:heart" class="w-3.5 h-3.5 text-rose hidden sm:block" />
           </div>
         </div>
       </div>
@@ -131,11 +103,14 @@
 <script setup lang="ts">
 import { gsap } from 'gsap'
 
-const { account, logout } = useAuth()
+// Hardcoded — no login needed
+const account = {
+  id: 4, email: 'aksel@nousdeux.fr', name: 'Aksel', color: '#4da6ff',
+  partnership_id: 1, partner_id: 5,
+  partner: { id: 5, name: 'Amandine', color: '#ff6b8a', email: 'amandine@nousdeux.fr' }
+}
 const navRef = ref<HTMLElement | null>(null)
-const dropdownRef = ref<HTMLElement | null>(null)
 const notifRef = ref<HTMLElement | null>(null)
-const showDropdown = ref(false)
 const showNotifs = ref(false)
 const notifications = ref<any[]>([])
 const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
@@ -165,12 +140,7 @@ function timeAgo(date: string) {
   return `Il y a ${Math.floor(hours / 24)}j`
 }
 
-async function handleLogout() {
-  showDropdown.value = false
-  await logout()
-}
-
-// Close dropdown on outside click
+// Close on outside click
 onMounted(() => {
   nextTick(() => {
     gsap.to(navRef.value, { autoAlpha: 1, duration: 0.5, ease: 'power3.out', delay: 0.1 })
@@ -180,7 +150,6 @@ onMounted(() => {
   setInterval(loadNotifications, 60000) // poll every 60s
 
   document.addEventListener('click', (e) => {
-    if (dropdownRef.value && !dropdownRef.value.contains(e.target as Node)) showDropdown.value = false
     if (notifRef.value && !notifRef.value.contains(e.target as Node)) showNotifs.value = false
   })
 
