@@ -193,7 +193,7 @@ export default defineEventHandler(async () => {
     'Égypte': 'Pyramides de Gizeh, Louxor, Croisière Nil, Alexandrie, Abou Simbel, Mer Rouge',
   }
   for (const [name, attr] of Object.entries(attrs)) {
-    await query('UPDATE countries SET attractions = $1 WHERE name = $2 AND (attractions IS NULL OR attractions = \\'\\')', [attr, name])
+    await query(`UPDATE countries SET attractions = $1 WHERE name = $2 AND (attractions IS NULL OR attractions = '')`, [attr, name])
   }
 
   // Seed parks (amusement parks)
