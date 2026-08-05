@@ -51,6 +51,7 @@ function getVisitedEmoji(name: string) {
 const search = ref('')
 const continentFilter = ref('')
 const parksOnly = ref(false)
+const showAllParks = ref(true) // show parks markers by default
 const continents = computed(() => ['', ...new Set(allPlaces.value.map((p: any) => p.continent))])
 const filteredPlaces = computed(() => allPlaces.value.filter((p: any) => {
   const ms = !search.value || p.name.toLowerCase().includes(search.value.toLowerCase()) || p.continent.toLowerCase().includes(search.value.toLowerCase())
@@ -88,7 +89,8 @@ const visitedByLabel: Record<string, string> = { [String(myId)]: `🧑 ${myName}
 
 // Map
 const mapContainer = ref<HTMLElement | null>(null)
-let mapInstance: any = null, markersLayer: any = null, geoJsonLayer: any = null, LeafletModule: any = null, geoJsonData: any = null
+let mapInstance: any = null, markersLayer: any = null, geoJsonLayer: any = null, parksLayer: any = null, LeafletModule: any = null, geoJsonData: any = null
+let parksData: any[] = []
 
 onMounted(async () => {
   await loadCountries()
@@ -108,6 +110,11 @@ onMounted(async () => {
     mapInstance = L.map(mapContainer.value, { center: [25, 0], zoom: 2, zoomControl: true, attributionControl: false, scrollWheelZoom: true })
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 18 }).addTo(mapInstance)
     markersLayer = L.layerGroup().addTo(mapInstance)
+
+    // Parks markers layer
+    parksLayer = L.layerGroup().addTo(mapInstance)
+    try { parksData = await $fetch('/api/parks') } catch { parksData = [] }
+    updateParksMarkers()
 
     if (geoJsonData) {
       geoJsonLayer = L.geoJSON(geoJsonData, {
@@ -159,11 +166,24 @@ function updateMarkers() {
   })
 }
 
+function updateParksMarkers() {
+  if (!parksLayer || !mapInstance || !LeafletModule) return
+  const L = LeafletModule.default
+  parksLayer.clearLayers()
+  if (!parksOnly.value && !showAllParks.value) return
+  parksData.forEach((park: any) => {
+    const html = `<div style="font-size:18px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.7))">🎢</div>`
+    const icon = L.divIcon({ html, className: 'park-marker', iconSize: [24, 24], iconAnchor: [12, 12] })
+    const marker = L.marker([park.lat, park.lng], { icon }).addTo(parksLayer)
+    marker.bindTooltip(`<b>${park.name}</b><br>${park.country}`, { direction: 'top', offset: [0, -14], className: 'park-tooltip' })
+  })
+}
+
 function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 0.8 }); openCountryModal(p) }
 
 // Update map when filters change
-watch([parksOnly, continentFilter, search], () => {
-  nextTick(() => { updateMarkers(); updateGeoJSON() })
+watch([parksOnly, continentFilter, search, showAllParks], () => {
+  nextTick(() => { updateMarkers(); updateGeoJSON(); updateParksMarkers() })
 })
 
 // Wishlist panel
@@ -334,4 +354,6 @@ const wishlistCountries = computed(() => allPlaces.value.filter((p: any) => getV
 .modal-enter-from > div:last-child, .modal-leave-to > div:last-child { transform: scale(0.95) translateY(10px); }
 .slide-enter-active, .slide-leave-active { transition: all 0.3s ease; }
 .slide-enter-from, .slide-leave-to { opacity: 0; transform: translateX(20px); }
+.park-tooltip { background: #1a1a24 !important; border: 1px solid #f0c060 !important; border-radius: 8px !important; color: #e8e8f0 !important; font-size: 12px; padding: 4px 8px; }
+.park-marker { background: transparent !important; border: none !important; }
 </style>
