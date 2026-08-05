@@ -139,9 +139,10 @@ function updateGeoJSON() {
     const place = allPlaces.value.find((p: any) => p.en === enName)
     if (!place) return { fillOpacity: 0, color: 'transparent', weight: 0 }
     const color = getVisitedColor(place.name)
-    return color
-      ? { fillColor: color, fillOpacity: 0.35, color, weight: 1.5, opacity: 0.8 }
-      : { fillOpacity: 0, color: 'transparent', weight: 0 }
+    if (color) return { fillColor: color, fillOpacity: 0.35, color, weight: 1.5, opacity: 0.8 }
+    // Highlight parks countries
+    if (parksOnly.value && place.parks) return { fillColor: '#f0c060', fillOpacity: 0.25, color: '#f0c060', weight: 1, opacity: 0.6 }
+    return { fillOpacity: 0, color: 'transparent', weight: 0 }
   })
 }
 
@@ -159,6 +160,11 @@ function updateMarkers() {
 }
 
 function flyToPlace(p: any) { mapInstance?.flyTo([p.lat, p.lng], 5, { duration: 0.8 }); openCountryModal(p) }
+
+// Update map when filters change
+watch([parksOnly, continentFilter, search], () => {
+  nextTick(() => { updateMarkers(); updateGeoJSON() })
+})
 
 // Wishlist panel
 const showWishlist = ref(true)
