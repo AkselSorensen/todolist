@@ -50,11 +50,13 @@ function getVisitedEmoji(name: string) {
 
 const search = ref('')
 const continentFilter = ref('')
+const parksOnly = ref(false)
 const continents = computed(() => ['', ...new Set(allPlaces.value.map((p: any) => p.continent))])
 const filteredPlaces = computed(() => allPlaces.value.filter((p: any) => {
   const ms = !search.value || p.name.toLowerCase().includes(search.value.toLowerCase()) || p.continent.toLowerCase().includes(search.value.toLowerCase())
   const mc = !continentFilter.value || p.continent === continentFilter.value
-  return ms && mc
+  const mp = !parksOnly.value || (p.parks && p.parks.length > 0)
+  return ms && mc && mp
 }))
 
 // Modal
@@ -185,6 +187,11 @@ const wishlistCountries = computed(() => allPlaces.value.filter((p: any) => getV
           class="w-full bg-surface2 border border-border rounded-xl pl-10 pr-4 py-2.5 text-text text-sm focus:outline-none focus:border-gold/50 transition-colors" />
       </div>
       <div class="flex gap-2 overflow-x-auto">
+        <button @click="parksOnly = !parksOnly"
+          class="px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1"
+          :class="parksOnly ? 'bg-gold/15 text-gold border border-gold/30' : 'bg-surface border border-border text-text-muted hover:text-text'">
+          🎢 Parcs
+        </button>
         <button v-for="c in continents" :key="c" @click="continentFilter = c"
           class="px-3 py-2 rounded-xl text-xs font-medium whitespace-nowrap transition-all"
           :class="continentFilter === c ? 'bg-gold/15 text-gold border border-gold/30' : 'bg-surface border border-border text-text-muted hover:text-text'">
@@ -202,6 +209,7 @@ const wishlistCountries = computed(() => allPlaces.value.filter((p: any) => getV
         @click="flyToPlace(p)">
         <span class="text-xl flex-shrink-0" :class="isVisited(p.name) ? '' : 'opacity-40 grayscale'">{{ p.emoji }}</span>
         <span class="text-sm font-medium text-text truncate flex-1">{{ p.name }}</span>
+        <span v-if="p.parks" class="text-xs flex-shrink-0" title="Parcs d'attractions">🎢</span>
         <span v-if="getVisitedEmoji(p.name)" class="text-xs flex-shrink-0">{{ getVisitedEmoji(p.name) }}</span>
       </div>
     </div>
@@ -257,6 +265,14 @@ const wishlistCountries = computed(() => allPlaces.value.filter((p: any) => getV
                 <Icon icon="lucide:map-pin" class="w-3 h-3" /> À visiter
               </p>
               <p class="text-sm text-text leading-relaxed">{{ selectedCountry.attractions }}</p>
+            </div>
+
+            <!-- Parks -->
+            <div v-if="selectedCountry.parks" class="mb-5 p-4 bg-surface2 rounded-xl border-l-2 border-gold/30">
+              <p class="text-xs font-semibold text-text-muted uppercase mb-2 flex items-center gap-1">
+                🎢 Parcs d'attractions
+              </p>
+              <p class="text-sm text-text leading-relaxed">{{ selectedCountry.parks }}</p>
             </div>
 
             <!-- Visited by -->

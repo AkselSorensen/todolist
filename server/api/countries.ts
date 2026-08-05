@@ -2,7 +2,7 @@ import { query } from '../utils/db'
 
 export default defineEventHandler(async (e) => {
   if (e.method === 'GET') {
-    const result = await query('SELECT name, en_name as en, lat, lng, continent, emoji, COALESCE(attractions,\'\') as attractions FROM countries ORDER BY name')
+    const result = await query('SELECT name, en_name as en, lat, lng, continent, emoji, COALESCE(attractions,\\'\\') as attractions, COALESCE(parks,\\'\\') as parks FROM countries ORDER BY name')
     return result.rows
   }
   if (e.method === 'POST') {

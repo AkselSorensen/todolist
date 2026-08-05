@@ -135,6 +135,8 @@ export default defineEventHandler(async () => {
   `)
   // Add attractions column if missing (migration)
   await query(`ALTER TABLE countries ADD COLUMN IF NOT EXISTS attractions TEXT DEFAULT ''`)
+  // Add parks column (amusement parks)
+  await query(`ALTER TABLE countries ADD COLUMN IF NOT EXISTS parks TEXT DEFAULT ''`)
 
   // Seed countries if empty
   const existingCountries = await query('SELECT COUNT(*) as c FROM countries')
@@ -191,7 +193,37 @@ export default defineEventHandler(async () => {
     'Égypte': 'Pyramides de Gizeh, Louxor, Croisière Nil, Alexandrie, Abou Simbel, Mer Rouge',
   }
   for (const [name, attr] of Object.entries(attrs)) {
-    await query('UPDATE countries SET attractions = $1 WHERE name = $2 AND (attractions IS NULL OR attractions = \'\')', [attr, name])
+    await query('UPDATE countries SET attractions = $1 WHERE name = $2 AND (attractions IS NULL OR attractions = \\'\\')', [attr, name])
+  }
+
+  // Seed parks (amusement parks)
+  const parkData: Record<string, string> = {
+    'France': 'Disneyland Paris, Parc Astérix, Futuroscope, Puy du Fou, Vulcania',
+    'États-Unis': 'Disney World Orlando, Universal Studios Hollywood, Six Flags, Cedar Point, Hersheypark',
+    'Japon': 'Tokyo Disneyland, Universal Studios Japan, Fuji-Q Highland, Nagashima Spa Land',
+    'Allemagne': 'Europa-Park, Phantasialand, Heide Park, Legoland Deutschland, Movie Park Germany',
+    'Espagne': 'PortAventura, Parque Warner Madrid, Siam Park, Ferrari Land',
+    'Italie': 'Gardaland, Mirabilandia, Cinecittà World, Zoomarine',
+    'Royaume-Uni': 'Alton Towers, Thorpe Park, Legoland Windsor, Blackpool Pleasure Beach',
+    'Pays-Bas': 'Efteling, Walibi Holland, Toverland, Duinrell',
+    'Danemark': 'Tivoli Gardens, Legoland Billund, Djurs Sommerland, Fårup Sommerland',
+    'Suède': 'Liseberg, Gröna Lund, Kolmården, Skara Sommarland',
+    'Émirats A. U.': 'Ferrari World Abu Dhabi, IMG Worlds of Adventure, Motiongate Dubai, Yas Waterworld',
+    'Chine': 'Shanghai Disneyland, Ocean Park Hong Kong, Chimelong Ocean Kingdom, Happy Valley',
+    'Corée du Sud': 'Everland, Lotte World, Seoul Land',
+    'Singapour': 'Universal Studios Singapore, Adventure Cove Waterpark, Wild Wild Wet',
+    'Canada': 'Canada Wonderland, La Ronde, Calaway Park, Playland',
+    'Australie': 'Movie World, Dreamworld, Sea World, Luna Park Sydney',
+    'Belgique': 'Walibi Belgium, Plopsaland, Bellewaerde, Bobbejaanland',
+    'Autriche': 'Prater Vienne, Area 47, Fantasiana',
+    'Finlande': 'Linnanmäki, Särkänniemi, PowerPark, Moomin World',
+    'Brésil': 'Beto Carrero World, Hopi Hari, Beach Park',
+    'Afrique du Sud': 'Gold Reef City, uShaka Marine World, Ratanga Junction',
+    'Mexique': 'Six Flags México, Xcaret, Xel-Há, La Feria de Chapultepec',
+    'Pologne': 'Energylandia, Legendia, Aquapark Reda',
+  }
+  for (const [name, parks] of Object.entries(parkData)) {
+    await query('UPDATE countries SET parks = $1 WHERE name = $2', [parks, name])
   }
 
   // Date spots (restos, bars, lieux à tester)
