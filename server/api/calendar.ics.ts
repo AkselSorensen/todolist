@@ -1,6 +1,6 @@
 import { query } from '../utils/db'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
   // Get events for partnership 1 (Aksel & Amandine)
   const events = await query(
     `SELECT title, description, event_type, start_time, end_time, all_day, location, color
@@ -35,7 +35,7 @@ export default defineEventHandler(async () => {
 
   icsLines.push('END:VCALENDAR')
 
-  setHeader('Content-Type', 'text/calendar; charset=utf-8')
-  setHeader('Content-Disposition', 'inline; filename="nousdeux.ics"')
+  setHeader(event, 'Content-Type', 'text/calendar; charset=utf-8')
+  setHeader(event, 'Content-Disposition', 'inline; filename="nousdeux.ics"')
   return icsLines.join('\r\n')
 })
