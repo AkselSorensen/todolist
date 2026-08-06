@@ -1,4 +1,4 @@
-const CACHE = 'nousdeux-v2'
+const CACHE = 'nousdeux-v3'
 
 self.addEventListener('install', () => { self.skipWaiting() })
 
@@ -11,19 +11,44 @@ self.addEventListener('activate', (e) => {
   )
 })
 
+// Push notifications
+self.addEventListener('push', (e) => {
+  if (!e.data) return
+  try {
+    const data = e.data.json()
+    e.waitUntil(
+      self.registration.showNotification(data.title, {
+        body: data.body,
+        icon: data.icon || '/icons/icon.svg',
+        badge: '/icons/icon.svg',
+        vibrate: [200, 100, 200],
+        data: { url: data.url || '/' },
+        actions: data.actions || []
+      })
+    )
+  } catch { /* ignore malformed push */ }
+})
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  e.waitUntil(
+    clients.matchAll({ type: 'window' }).then(clientList => {
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) return client.focus()
+      }
+      return clients.openWindow(e.notification.data?.url || '/')
+    })
+  )
+})
+
 self.addEventListener('message', (e) => {
   if (e.data?.type === 'SKIP_WAITING') self.skipWaiting()
 })
 
 self.addEventListener('fetch', (e) => {
-  // Only cache GET requests — POST/PATCH/DELETE passthrough
   if (e.request.method !== 'GET') return
-
   const url = new URL(e.request.url)
-  // API calls: network-first, no cache
   if (url.pathname.startsWith('/api/')) return
-
-  // Same-origin assets: network-first
   if (url.origin === self.location.origin) {
     e.respondWith(
       fetch(e.request)

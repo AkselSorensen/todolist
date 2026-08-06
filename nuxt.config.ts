@@ -5,13 +5,16 @@ export default defineNuxtConfig({
   modules: [],
   css: ['~/assets/css/main.css'],
   nitro: {
-    preset: 'vercel'
+    preset: 'vercel',
+    externals: ['web-push']
   },
   vite: {
     plugins: [tailwindcss()]
   },
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL || '',
+    vapidPublicKey: process.env.VAPID_PUBLIC_KEY || 'BOLCovKvfjnixTUZsfYPEVT2wdzCP7VvdZyir79G6VLG3pyV_G7WgfBf_0TYEFZoJlAdKGQBhEeMTaNEMRqt28Q',
+    vapidPrivateKey: process.env.VAPID_PRIVATE_KEY || 'Acus0oigoQYEdfsStYxOCGwFuKMdvuScgVSBANSgD7g',
     public: {
       appName: 'Nous Deux'
     }

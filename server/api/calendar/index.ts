@@ -1,5 +1,27 @@
 import { query } from '../../utils/db'
 import { getCurrentAccount } from '../../utils/auth'
+import webpush from 'web-push'
+
+async function sendPushNotifications(partnershipId: number, title: string, body: string) {
+  try {
+    const config = useRuntimeConfig()
+    webpush.setVapidDetails('mailto:nousdeux@example.com', config.vapidPublicKey, config.vapidPrivateKey)
+
+    const subs = await query('SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE partnership_id = $1', [partnershipId])
+    for (const sub of subs.rows) {
+      try {
+        await webpush.sendNotification({
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.p256dh, auth: sub.auth }
+        }, JSON.stringify({ title, body, icon: '/icons/icon.svg' }))
+      } catch (e: any) {
+        if (e.statusCode === 410) {
+          await query('DELETE FROM push_subscriptions WHERE endpoint = $1', [sub.endpoint])
+        }
+      }
+    }
+  } catch { /* push failed silently */ }
+}
 
 export default defineEventHandler(async (e) => {
   const account = await getCurrentAccount(e)
@@ -25,6 +47,11 @@ export default defineEventHandler(async (e) => {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
         [body.title, body.description || '', et, body.start_time, body.end_time || null, body.all_day || false,
          account.id, body.alert_before || 0, body.color || '#a78bfa', body.location || '', account.partnership_id])
+
+      // Send push notification
+      const dateStr = body.start_time ? new Date(body.start_time).toLocaleDateString('fr-FR') : ''
+      sendPushNotifications(account.partnership_id, '📅 Nouvel événement', `${account.name} a ajouté : ${body.title}${dateStr ? ' — ' + dateStr : ''}`)
+
       return r.rows[0]
     }
     if (method === 'DELETE') {

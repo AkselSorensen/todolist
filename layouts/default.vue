@@ -61,6 +61,12 @@
             </Transition>
           </div>
 
+          <!-- Enable push -->
+          <button v-if="pushSupported && !pushSubscribed" @click="subscribePush"
+            class="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-mint/10 text-mint border border-mint/20 hover:bg-mint/20 transition-colors hidden sm:flex items-center gap-1">
+            <Icon icon="lucide:bell-ring" class="w-3.5 h-3.5" /> Notifs
+          </button>
+
           <!-- Aksel & Amandine -->
           <div class="flex items-center gap-1.5 px-2.5 py-1.5">
             <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white" :style="{ background: account.color }">
@@ -119,6 +125,40 @@ const showInstallModal = ref(false)
 
 async function loadNotifications() {
   try { notifications.value = await $fetch('/api/notifications') } catch { notifications.value = [] }
+}
+
+// Push notifications
+const pushSupported = ref(false)
+const pushSubscribed = ref(false)
+
+onMounted(async () => {
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    pushSupported.value = true
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.getSubscription()
+    pushSubscribed.value = !!sub
+  }
+})
+
+async function subscribePush() {
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const { publicKey } = await $fetch('/api/push-subscribe')
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    })
+    await $fetch('/api/push-subscribe', { method: 'POST', body: { subscription: sub } })
+    pushSubscribed.value = true
+  } catch (e) {
+    console.log('Push subscribe failed:', e)
+  }
+}
+
+function urlBase64ToUint8Array(b64: string) {
+  const padding = '='.repeat((4 - b64.length % 4) % 4)
+  const raw = atob((b64 + padding).replace(/-/g, '+').replace(/_/g, '/'))
+  return new Uint8Array([...raw].map(c => c.charCodeAt(0)))
 }
 async function markAllRead() {
   await $fetch('/api/notifications', { method: 'PATCH', body: { read_all: true } })

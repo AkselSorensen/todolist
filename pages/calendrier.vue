@@ -211,6 +211,9 @@ onUnmounted(() => ctx?.revert())
         <p class="text-text-muted text-xs sm:text-sm mt-1">
           <span v-if="rangeStart && !rangeEnd" class="text-lavender">Clique une 2ᵉ date pour définir une plage</span>
           <span v-else>Nos disponibilités, sorties et rappels</span>
+          <a href="/api/calendar.ics" class="ml-3 text-xs text-lavender hover:text-lavender-soft underline inline-flex items-center gap-1">
+            <Icon icon="lucide:smartphone" class="w-3 h-3" /> Sync calendrier
+          </a>
         </p>
       </div>
       <div class="flex items-center gap-2">
