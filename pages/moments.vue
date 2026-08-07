@@ -599,10 +599,10 @@ onUnmounted(() => { stopChatPolling() })
     </div>
   </div>
 
-  <!-- Identity picker modal (shared for chat tab) -->
+  <!-- Identity picker modal (only when Messages tab is active) -->
   <Teleport to="body">
     <Transition name="modal">
-      <div v-if="showChatPicker" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div v-if="showChatPicker && activeTab === 'notes'" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-dark/90 backdrop-blur-md" />
         <div class="relative bg-surface border border-border rounded-2xl w-full max-w-sm p-8 shadow-2xl text-center">
           <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose to-lavender flex items-center justify-center mx-auto mb-4">
