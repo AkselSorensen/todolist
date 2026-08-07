@@ -1,5 +1,4 @@
 import { query } from '../../utils/db'
-import { getCurrentAccount } from '../../utils/auth'
 
 // Auto-create messages table if it doesn't exist
 async function ensureTable() {
@@ -16,9 +15,8 @@ async function ensureTable() {
 }
 
 export default defineEventHandler(async (e) => {
-  const account = await getCurrentAccount(e)
-  if (!account.partnership_id) throw createError({ statusCode: 400, message: 'No partner yet' })
-
+  // No auth required — from_id is passed by the client
+  const PARTNERSHIP_ID = 1
   await ensureTable()
 
   if (e.method === 'GET') {
@@ -26,34 +24,30 @@ export default defineEventHandler(async (e) => {
     let sql = `SELECT m.*, a.name as from_name, a.color as from_color
                FROM messages m LEFT JOIN accounts a ON m.from_id = a.id
                WHERE m.partnership_id = $1`
-    const params: any[] = [account.partnership_id]; let i = 2
+    const params: any[] = [PARTNERSHIP_ID]; let i = 2
     if (since) { sql += ` AND m.id > $${i++}`; params.push(since) }
     sql += ' ORDER BY m.created_at ASC LIMIT 100'
     const result = await query(sql, params)
-
-    // Mark partner's messages as read
-    const partnerMsgs = result.rows.filter((r: any) => r.from_id !== account.id && !r.read).map((r: any) => r.id)
-    if (partnerMsgs.length > 0) {
-      await query(`UPDATE messages SET read = true WHERE id = ANY($1)`, [partnerMsgs])
-    }
-
     return result.rows
   }
 
   if (e.method === 'POST') {
-    const { message } = await readBody(e)
+    const body = await readBody(e)
+    const { message, from_id } = body
     if (!message || !message.trim()) throw createError({ statusCode: 400, message: 'Message required' })
+    if (!from_id || ![4, 5].includes(from_id)) throw createError({ statusCode: 400, message: 'Invalid from_id' })
 
     const r = await query(
       `INSERT INTO messages (partnership_id, from_id, message) VALUES ($1,$2,$3) RETURNING *`,
-      [account.partnership_id, account.id, message.trim()]
+      [PARTNERSHIP_ID, from_id, message.trim()]
     )
-    return { ...r.rows[0], from_name: account.name, from_color: account.color }
+    return { ...r.rows[0], from_name: from_id === 4 ? 'Aksel' : 'Amandine', from_color: from_id === 4 ? '#4da6ff' : '#ff6b8a' }
   }
 
   if (e.method === 'PATCH') {
+    const { my_id } = await readBody(e)
     await query('UPDATE messages SET read = true WHERE partnership_id = $1 AND from_id != $2 AND read = false',
-      [account.partnership_id, account.id])
+      [PARTNERSHIP_ID, my_id || 4])
     return { success: true }
   }
 })

@@ -34,10 +34,15 @@ async function setMood(mood: string) {
 }
 
 // ---- Messages chat ----
+const { identity: chatIdentity, showPicker: showChatPicker, load: loadChatIdentity, pick: pickChatIdentity } = useChatIdentity()
 const chatMessages = ref<any[]>([])
 const newChatMsg = ref('')
 const chatRef = ref<HTMLElement | null>(null)
 let chatTimer: ReturnType<typeof setInterval> | null = null
+
+const myChatId = computed(() => chatIdentity.value?.id || 0)
+const myChatName = computed(() => chatIdentity.value?.name || '')
+const myChatColor = computed(() => chatIdentity.value?.color || '#a78bfa')
 
 async function loadChatMessages(since?: number) {
   try {
@@ -56,13 +61,19 @@ async function loadChatMessages(since?: number) {
 
 async function sendChatMessage() {
   const text = newChatMsg.value.trim()
-  if (!text) return
+  if (!text || !chatIdentity.value) return
   try {
-    const sent = await $fetch('/api/messages', { method: 'POST', body: { message: text } })
+    const sent = await $fetch('/api/messages', { method: 'POST', body: { message: text, from_id: chatIdentity.value.id } })
     chatMessages.value.push(sent)
     newChatMsg.value = ''
     await nextTick(); scrollChatBottom()
-  } catch { /* garde le texte dans l'input */ }
+  } catch { /* garde le texte */ }
+}
+
+function changeChatIdentity() {
+  const { clear } = useChatIdentity()
+  clear()
+  stopChatPolling()
 }
 
 function scrollChatBottom() {
@@ -193,6 +204,7 @@ async function deleteTrip(id: number) {
 function formatTripDate(d: string) { if (!d) return ''; return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) }
 
 onMounted(async () => {
+  loadChatIdentity()
   await Promise.all([loadMoods(), loadMemories(), loadSpots(), loadGifts(), loadTrips()])
   nextTick(() => {
     gsap.fromTo('.moment-card', { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' })
@@ -202,7 +214,7 @@ onMounted(async () => {
 // Switch tab + refresh
 watch(activeTab, async (tab) => {
   if (tab === 'mood') await loadMoods()
-  if (tab === 'notes') await loadChatMessages()
+  if (tab === 'notes' && chatIdentity.value) await loadChatMessages()
   if (tab === 'timeline') await loadMemories()
   if (tab === 'spots') await loadSpots()
   if (tab === 'gifts') await loadGifts()
@@ -212,9 +224,9 @@ watch(activeTab, async (tab) => {
   })
 })
 
-// Poll chat when messages tab is active
-watch(activeTab, (tab) => {
-  if (tab === 'notes') startChatPolling()
+// Poll chat when messages tab is active AND identity chosen
+watch([activeTab, chatIdentity], ([tab, id]) => {
+  if (tab === 'notes' && id) startChatPolling()
   else stopChatPolling()
 })
 
@@ -268,9 +280,29 @@ onUnmounted(() => { stopChatPolling() })
 
     <!-- ========= MESSAGES CHAT ========= -->
     <div v-if="activeTab === 'notes'" class="flex flex-col" style="height: calc(100vh - 280px); min-height: 400px;">
+      <!-- Header -->
+      <div class="flex items-center justify-between mb-3 flex-shrink-0">
+        <p class="text-sm font-semibold text-text-muted">Chat en direct</p>
+        <button v-if="chatIdentity" @click="changeChatIdentity"
+          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border border-border hover:bg-surface2 transition-colors"
+          :style="{ color: myChatColor }">
+          <div class="w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold text-white" :style="{ background: myChatColor }">
+            {{ myChatName.charAt(0) }}
+          </div>
+          {{ myChatName }}
+          <Icon icon="lucide:chevron-down" class="w-3 h-3" />
+        </button>
+      </div>
+
       <!-- Messages area -->
       <div ref="chatRef" class="flex-1 overflow-y-auto space-y-5 mb-4 px-1 scroll-smooth">
-        <div v-if="chatMessages.length === 0" class="flex items-center justify-center h-full">
+        <div v-if="!chatIdentity" class="flex items-center justify-center h-full">
+          <div class="text-center text-text-muted">
+            <Icon icon="lucide:user" class="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p class="text-sm">Choisis ton prénom pour chatter</p>
+          </div>
+        </div>
+        <div v-else-if="chatMessages.length === 0" class="flex items-center justify-center h-full">
           <div class="text-center text-text-muted">
             <Icon icon="lucide:messages-square" class="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p class="text-sm">Pas encore de messages</p>
@@ -287,30 +319,30 @@ onUnmounted(() => { stopChatPolling() })
 
           <div v-for="m in group.messages" :key="m.id"
             class="flex gap-2.5"
-            :class="m.from_id === account.id ? 'justify-end' : 'justify-start'">
-            <div v-if="m.from_id !== account.id"
+            :class="m.from_id === myChatId ? 'justify-end' : 'justify-start'">
+            <div v-if="m.from_id !== myChatId"
               class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0 self-end"
-              :style="{ background: m.from_color || account.partner.color }">
+              :style="{ background: m.from_color || '#ff6b8a' }">
               {{ m.from_name?.charAt(0) }}
             </div>
             <div class="max-w-[75%] sm:max-w-[65%]">
               <div class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
-                :class="m.from_id === account.id
+                :class="m.from_id === myChatId
                   ? 'bg-gradient-to-r from-lavender to-rose text-white rounded-br-md'
                   : 'bg-surface2 text-text border border-border rounded-bl-md'">
                 {{ m.message }}
               </div>
               <div class="flex items-center gap-1.5 mt-0.5"
-                :class="m.from_id === account.id ? 'justify-end' : 'justify-start'">
+                :class="m.from_id === myChatId ? 'justify-end' : 'justify-start'">
                 <span class="text-[10px] text-text-muted">{{ chatTime(m.created_at) }}</span>
-                <Icon v-if="m.from_id === account.id && m.read" icon="lucide:check-check" class="w-3 h-3 text-lavender" />
-                <Icon v-else-if="m.from_id === account.id" icon="lucide:check" class="w-3 h-3 text-text-muted" />
+                <Icon v-if="m.from_id === myChatId && m.read" icon="lucide:check-check" class="w-3 h-3 text-lavender" />
+                <Icon v-else-if="m.from_id === myChatId" icon="lucide:check" class="w-3 h-3 text-text-muted" />
               </div>
             </div>
-            <div v-if="m.from_id === account.id"
+            <div v-if="m.from_id === myChatId"
               class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0 self-end"
-              :style="{ background: account.color }">
-              {{ account.name.charAt(0) }}
+              :style="{ background: myChatColor }">
+              {{ myChatName.charAt(0) }}
             </div>
           </div>
         </div>
@@ -318,10 +350,12 @@ onUnmounted(() => { stopChatPolling() })
 
       <!-- Input -->
       <div class="flex gap-2 flex-shrink-0 pt-3 border-t border-border">
-        <input v-model="newChatMsg" @keyup.enter="sendChatMessage"
-          placeholder="Écris un message..."
+        <input v-if="chatIdentity" v-model="newChatMsg" @keyup.enter="sendChatMessage"
+          :placeholder="`Écris en tant que ${myChatName}...`"
           class="flex-1 bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors" />
-        <button @click="sendChatMessage" :disabled="!newChatMsg.trim()"
+        <input v-else disabled placeholder="Choisis ton prénom d'abord" @click="showChatPicker = true"
+          class="flex-1 bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text-muted text-sm cursor-pointer" />
+        <button @click="sendChatMessage" :disabled="!chatIdentity || !newChatMsg.trim()"
           class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-1.5">
           <Icon icon="lucide:send" class="w-4 h-4" />
         </button>
@@ -564,10 +598,49 @@ onUnmounted(() => { stopChatPolling() })
       </div>
     </div>
   </div>
+
+  <!-- Identity picker modal (shared for chat tab) -->
+  <Teleport to="body">
+    <Transition name="modal">
+      <div v-if="showChatPicker" class="fixed inset-0 z-[200] flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-dark/90 backdrop-blur-md" />
+        <div class="relative bg-surface border border-border rounded-2xl w-full max-w-sm p-8 shadow-2xl text-center">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-rose to-lavender flex items-center justify-center mx-auto mb-4">
+            <Icon icon="lucide:user" class="w-8 h-8 text-white" />
+          </div>
+          <h2 class="text-xl font-bold mb-1">Qui es-tu ?</h2>
+          <p class="text-sm text-text-muted mb-6">Choisis ton prénom pour qu'on sache qui envoie quoi</p>
+
+          <div class="space-y-3">
+            <button @click="pickChatIdentity(4, 'Aksel', '#4da6ff')"
+              class="w-full p-4 rounded-xl border-2 border-border hover:border-[#4da6ff] hover:bg-[#4da6ff]/5 transition-all flex items-center gap-4 group">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center text-lg font-bold text-white" style="background: #4da6ff">A</div>
+              <div class="text-left">
+                <p class="font-bold text-sm group-hover:text-[#4da6ff] transition-colors">Aksel</p>
+                <p class="text-xs text-text-muted">aksel@nousdeux.fr</p>
+              </div>
+            </button>
+
+            <button @click="pickChatIdentity(5, 'Amandine', '#ff6b8a')"
+              class="w-full p-4 rounded-xl border-2 border-border hover:border-[#ff6b8a] hover:bg-[#ff6b8a]/5 transition-all flex items-center gap-4 group">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center text-lg font-bold text-white" style="background: #ff6b8a">A</div>
+              <div class="text-left">
+                <p class="font-bold text-sm group-hover:text-[#ff6b8a] transition-colors">Amandine</p>
+                <p class="text-xs text-text-muted">amandine@nousdeux.fr</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
 .fade-enter-active, .fade-leave-active { transition: all 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-4px); }
+.modal-enter-active, .modal-leave-active { transition: all 0.3s ease; }
+.modal-enter-from, .modal-leave-to { opacity: 0; }
+.modal-enter-from > div:last-child, .modal-leave-to > div:last-child { transform: scale(0.9) translateY(20px); }
 .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>
