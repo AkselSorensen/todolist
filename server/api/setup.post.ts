@@ -312,6 +312,18 @@ export default defineEventHandler(async () => {
     )
   `)
 
+  // Messages (chat conversationnel)
+  await query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      from_id INT REFERENCES accounts(id),
+      message TEXT NOT NULL,
+      read BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+
   // Trip proposals
   await query(`
     CREATE TABLE IF NOT EXISTS trip_proposals (

@@ -25,6 +25,10 @@
             :class="$route.path === '/moments' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
             <Icon icon="lucide:sparkles" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden xs:inline">Moments</span>
           </NuxtLink>
+          <NuxtLink to="/messages" class="px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
+            :class="$route.path === '/messages' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
+            <Icon icon="lucide:message-circle" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden xs:inline">Chat</span>
+          </NuxtLink>
 
           <!-- Notification bell -->
           <div class="relative" ref="notifRef">

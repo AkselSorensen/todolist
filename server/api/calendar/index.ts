@@ -52,6 +52,17 @@ export default defineEventHandler(async (e) => {
       const dateStr = body.start_time ? new Date(body.start_time).toLocaleDateString('fr-FR') : ''
       sendPushNotifications(account.partnership_id, '📅 Nouvel événement', `${account.name} a ajouté : ${body.title}${dateStr ? ' — ' + dateStr : ''}`)
 
+      // Create in-app notification for partner
+      const partnerId = account.partner_id
+      if (partnerId) {
+        await query(
+          `INSERT INTO notifications (partnership_id, from_id, to_id, type, message, link) VALUES ($1,$2,$3,'calendar',$4,$5)`,
+          [account.partnership_id, account.id, partnerId,
+           `${account.name} a ajouté un événement : ${body.title}`,
+           '/calendrier']
+        )
+      }
+
       return r.rows[0]
     }
     if (method === 'DELETE') {
