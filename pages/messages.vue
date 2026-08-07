@@ -31,13 +31,13 @@ async function loadMessages(since?: number) {
 async function sendMessage() {
   const text = newMsg.value.trim()
   if (!text) return
-  newMsg.value = ''
   try {
     const sent = await $fetch('/api/messages', { method: 'POST', body: { message: text } })
     messages.value.push(sent)
+    newMsg.value = ''
     await nextTick()
     scrollBottom()
-  } catch { /* ignore */ }
+  } catch { /* garde le texte */ }
 }
 
 function scrollBottom() {

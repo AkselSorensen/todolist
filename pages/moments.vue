@@ -57,12 +57,12 @@ async function loadChatMessages(since?: number) {
 async function sendChatMessage() {
   const text = newChatMsg.value.trim()
   if (!text) return
-  newChatMsg.value = ''
   try {
     const sent = await $fetch('/api/messages', { method: 'POST', body: { message: text } })
     chatMessages.value.push(sent)
+    newChatMsg.value = ''
     await nextTick(); scrollChatBottom()
-  } catch { /* ok */ }
+  } catch { /* garde le texte dans l'input */ }
 }
 
 function scrollChatBottom() {

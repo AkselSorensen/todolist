@@ -1,9 +1,25 @@
 import { query } from '../../utils/db'
 import { getCurrentAccount } from '../../utils/auth'
 
+// Auto-create messages table if it doesn't exist
+async function ensureTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      from_id INT REFERENCES accounts(id),
+      message TEXT NOT NULL,
+      read BOOLEAN DEFAULT false,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+}
+
 export default defineEventHandler(async (e) => {
   const account = await getCurrentAccount(e)
   if (!account.partnership_id) throw createError({ statusCode: 400, message: 'No partner yet' })
+
+  await ensureTable()
 
   if (e.method === 'GET') {
     const { since } = getQuery(e)
@@ -36,7 +52,6 @@ export default defineEventHandler(async (e) => {
   }
 
   if (e.method === 'PATCH') {
-    // Mark all as read
     await query('UPDATE messages SET read = true WHERE partnership_id = $1 AND from_id != $2 AND read = false',
       [account.partnership_id, account.id])
     return { success: true }
