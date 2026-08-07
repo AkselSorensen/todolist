@@ -47,6 +47,38 @@ async function sendMessage() {
   } catch { /* garde le texte */ }
 }
 
+const editingId = ref<number | null>(null)
+const editText = ref('')
+
+function startEdit(m: any) {
+  editingId.value = m.id
+  editText.value = m.message
+}
+
+async function saveEdit() {
+  if (!editText.value.trim() || !editingId.value) return
+  try {
+    const updated = await $fetch('/api/messages', {
+      method: 'PATCH',
+      body: { id: editingId.value, message: editText.value }
+    })
+    const idx = messages.value.findIndex(m => m.id === editingId.value)
+    if (idx !== -1) messages.value[idx] = { ...messages.value[idx], message: editText.value.trim(), edited: true }
+    editingId.value = null
+    editText.value = ''
+  } catch { /* ignore */ }
+}
+
+function cancelEdit() { editingId.value = null; editText.value = '' }
+
+async function deleteMessage(id: number) {
+  if (!confirm('Supprimer ce message ?')) return
+  try {
+    await $fetch(`/api/messages?id=${id}&from_id=${identity.value?.id || 0}`, { method: 'DELETE' })
+    messages.value = messages.value.filter(m => m.id !== id)
+  } catch { /* ignore */ }
+}
+
 function scrollBottom() {
   nextTick(() => {
     if (chatRef.value) chatRef.value.scrollTop = chatRef.value.scrollHeight
@@ -164,11 +196,33 @@ onUnmounted(() => {
           </div>
 
           <div class="max-w-[75%] sm:max-w-[65%]">
-            <div class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
+            <!-- Edit mode -->
+            <div v-if="editingId === m.id" class="flex flex-col gap-2">
+              <input v-model="editText" @keyup.enter="saveEdit" @keyup.escape="cancelEdit"
+                class="w-full bg-surface2 border border-gold/50 rounded-xl px-3 py-2 text-text text-sm focus:outline-none" />
+              <div class="flex gap-1 justify-end">
+                <button @click="cancelEdit" class="px-2.5 py-1 rounded-lg text-xs text-text-muted hover:bg-surface2">Annuler</button>
+                <button @click="saveEdit" class="px-2.5 py-1 rounded-lg text-xs bg-gold/15 text-gold font-medium hover:bg-gold/20">Enregistrer</button>
+              </div>
+            </div>
+
+            <!-- Normal bubble -->
+            <div v-else class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed relative group"
               :class="m.from_id === myId
                 ? 'bg-gradient-to-r from-lavender to-rose text-white rounded-br-md'
                 : 'bg-surface2 text-text border border-border rounded-bl-md'">
               {{ m.message }}
+              <span v-if="m.edited" class="text-[10px] opacity-60 ml-1">(modifié)</span>
+
+              <!-- Edit/delete on hover (own messages only) -->
+              <div v-if="m.from_id === myId" class="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 -translate-y-full">
+                <button @click="startEdit(m)" class="w-6 h-6 rounded-lg bg-surface border border-border flex items-center justify-center hover:bg-surface2 transition-colors">
+                  <Icon icon="lucide:pencil" class="w-3 h-3 text-text-muted" />
+                </button>
+                <button @click="deleteMessage(m.id)" class="w-6 h-6 rounded-lg bg-surface border border-border flex items-center justify-center hover:bg-rose/10 hover:border-rose/30 transition-colors">
+                  <Icon icon="lucide:trash-2" class="w-3 h-3 text-text-muted hover:text-rose" />
+                </button>
+              </div>
             </div>
             <div class="flex items-center gap-1.5 mt-0.5"
               :class="m.from_id === myId ? 'justify-end' : 'justify-start'">

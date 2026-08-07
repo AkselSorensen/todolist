@@ -70,6 +70,31 @@ async function sendChatMessage() {
   } catch { /* garde le texte */ }
 }
 
+const editingChatId = ref<number | null>(null)
+const editChatText = ref('')
+
+function startChatEdit(m: any) { editingChatId.value = m.id; editChatText.value = m.message }
+
+async function saveChatEdit() {
+  if (!editChatText.value.trim() || !editingChatId.value) return
+  try {
+    await $fetch('/api/messages', { method: 'PATCH', body: { id: editingChatId.value, message: editChatText.value } })
+    const idx = chatMessages.value.findIndex(m => m.id === editingChatId.value)
+    if (idx !== -1) chatMessages.value[idx] = { ...chatMessages.value[idx], message: editChatText.value.trim(), edited: true }
+    editingChatId.value = null; editChatText.value = ''
+  } catch { /* ok */ }
+}
+
+function cancelChatEdit() { editingChatId.value = null; editChatText.value = '' }
+
+async function deleteChatMessage(id: number) {
+  if (!confirm('Supprimer ce message ?')) return
+  try {
+    await $fetch(`/api/messages?id=${id}&from_id=${chatIdentity.value?.id || 0}`, { method: 'DELETE' })
+    chatMessages.value = chatMessages.value.filter(m => m.id !== id)
+  } catch { /* ok */ }
+}
+
 function changeChatIdentity() {
   const { clear } = useChatIdentity()
   clear()
@@ -326,11 +351,33 @@ onUnmounted(() => { stopChatPolling() })
               {{ m.from_name?.charAt(0) }}
             </div>
             <div class="max-w-[75%] sm:max-w-[65%]">
-              <div class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
+              <!-- Edit mode -->
+              <div v-if="editingChatId === m.id" class="flex flex-col gap-2">
+                <input v-model="editChatText" @keyup.enter="saveChatEdit" @keyup.escape="cancelChatEdit"
+                  class="w-full bg-surface2 border border-gold/50 rounded-xl px-3 py-2 text-text text-sm focus:outline-none" />
+                <div class="flex gap-1 justify-end">
+                  <button @click="cancelChatEdit" class="px-2.5 py-1 rounded-lg text-xs text-text-muted hover:bg-surface2">Annuler</button>
+                  <button @click="saveChatEdit" class="px-2.5 py-1 rounded-lg text-xs bg-gold/15 text-gold font-medium hover:bg-gold/20">Enregistrer</button>
+                </div>
+              </div>
+
+              <!-- Normal bubble -->
+              <div v-else class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed relative group"
                 :class="m.from_id === myChatId
                   ? 'bg-gradient-to-r from-lavender to-rose text-white rounded-br-md'
                   : 'bg-surface2 text-text border border-border rounded-bl-md'">
                 {{ m.message }}
+                <span v-if="m.edited" class="text-[10px] opacity-60 ml-1">(modifié)</span>
+
+                <!-- Edit/delete on hover (own messages only) -->
+                <div v-if="m.from_id === myChatId" class="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 -translate-y-full">
+                  <button @click="startChatEdit(m)" class="w-6 h-6 rounded-lg bg-surface border border-border flex items-center justify-center hover:bg-surface2 transition-colors">
+                    <Icon icon="lucide:pencil" class="w-3 h-3 text-text-muted" />
+                  </button>
+                  <button @click="deleteChatMessage(m.id)" class="w-6 h-6 rounded-lg bg-surface border border-border flex items-center justify-center hover:bg-rose/10 hover:border-rose/30 transition-colors">
+                    <Icon icon="lucide:trash-2" class="w-3 h-3 text-text-muted hover:text-rose" />
+                  </button>
+                </div>
               </div>
               <div class="flex items-center gap-1.5 mt-0.5"
                 :class="m.from_id === myChatId ? 'justify-end' : 'justify-start'">
