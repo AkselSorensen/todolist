@@ -33,19 +33,70 @@ async function setMood(mood: string) {
   await loadMoods()
 }
 
-// ---- Notes ----
-const notes = ref<any[]>([])
-const newNote = ref('')
-const showSent = ref(false)
-async function loadNotes() {
-  try { notes.value = await $fetch(`/api/notes${showSent.value ? '?sent=true' : ''}`) } catch { notes.value = [] }
+// ---- Messages chat ----
+const chatMessages = ref<any[]>([])
+const newChatMsg = ref('')
+const chatRef = ref<HTMLElement | null>(null)
+let chatTimer: ReturnType<typeof setInterval> | null = null
+
+async function loadChatMessages(since?: number) {
+  try {
+    const url = since ? `/api/messages?since=${since}` : '/api/messages'
+    const data = await $fetch(url)
+    if (since) {
+      const existing = new Set(chatMessages.value.map(m => m.id))
+      for (const m of data) { if (!existing.has(m.id)) chatMessages.value.push(m) }
+    } else {
+      chatMessages.value = data
+    }
+    await nextTick()
+    scrollChatBottom()
+  } catch { /* ok */ }
 }
-async function sendNote() {
-  if (!newNote.value.trim()) return
-  await $fetch('/api/notes', { method: 'POST', body: { message: newNote.value } })
-  newNote.value = ''
-  await loadNotes()
+
+async function sendChatMessage() {
+  const text = newChatMsg.value.trim()
+  if (!text) return
+  newChatMsg.value = ''
+  try {
+    const sent = await $fetch('/api/messages', { method: 'POST', body: { message: text } })
+    chatMessages.value.push(sent)
+    await nextTick(); scrollChatBottom()
+  } catch { /* ok */ }
 }
+
+function scrollChatBottom() {
+  nextTick(() => { if (chatRef.value) chatRef.value.scrollTop = chatRef.value.scrollHeight })
+}
+
+function chatTime(d: string) { return new Date(d).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }
+
+function chatDate(d: string) {
+  const date = new Date(d); const today = new Date()
+  if (date.toDateString() === today.toDateString()) return "Aujourd'hui"
+  const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return 'Hier'
+  return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+const groupedChat = computed(() => {
+  const groups: { date: string; messages: any[] }[] = []; let lastDate = ''
+  for (const m of chatMessages.value) {
+    const d = m.created_at?.split('T')[0]
+    if (d !== lastDate) { groups.push({ date: d, messages: [m] }); lastDate = d }
+    else { groups[groups.length - 1].messages.push(m) }
+  }
+  return groups
+})
+
+function startChatPolling() {
+  chatTimer = setInterval(async () => {
+    const lastId = chatMessages.value.length > 0 ? chatMessages.value[chatMessages.value.length - 1].id : 0
+    await loadChatMessages(lastId)
+  }, 3000)
+}
+
+function stopChatPolling() { if (chatTimer) { clearInterval(chatTimer); chatTimer = null } }
 
 // ---- Timeline ----
 const memories = ref<any[]>([])
@@ -142,7 +193,7 @@ async function deleteTrip(id: number) {
 function formatTripDate(d: string) { if (!d) return ''; return new Date(d + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) }
 
 onMounted(async () => {
-  await Promise.all([loadMoods(), loadNotes(), loadMemories(), loadSpots(), loadGifts(), loadTrips()])
+  await Promise.all([loadMoods(), loadMemories(), loadSpots(), loadGifts(), loadTrips()])
   nextTick(() => {
     gsap.fromTo('.moment-card', { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' })
   })
@@ -151,7 +202,7 @@ onMounted(async () => {
 // Switch tab + refresh
 watch(activeTab, async (tab) => {
   if (tab === 'mood') await loadMoods()
-  if (tab === 'notes') await loadNotes()
+  if (tab === 'notes') await loadChatMessages()
   if (tab === 'timeline') await loadMemories()
   if (tab === 'spots') await loadSpots()
   if (tab === 'gifts') await loadGifts()
@@ -160,6 +211,14 @@ watch(activeTab, async (tab) => {
     gsap.fromTo('.moment-card', { autoAlpha: 0, y: 20 }, { autoAlpha: 1, y: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out' })
   })
 })
+
+// Poll chat when messages tab is active
+watch(activeTab, (tab) => {
+  if (tab === 'notes') startChatPolling()
+  else stopChatPolling()
+})
+
+onUnmounted(() => { stopChatPolling() })
 </script>
 
 <template>
@@ -207,53 +266,65 @@ watch(activeTab, async (tab) => {
       <p v-else class="text-center text-text-muted text-sm mt-6">Pas encore de mood aujourd'hui... 😴</p>
     </div>
 
-    <!-- ========= LOVE NOTES ========= -->
-    <div v-if="activeTab === 'notes'">
-      <div class="flex gap-2 mb-4">
-        <button @click="showSent = false" class="px-4 py-2 rounded-xl text-sm font-medium transition-all"
-          :class="!showSent ? 'bg-rose/15 text-rose border border-rose/30' : 'text-text-muted border border-border hover:bg-surface2'">
-          📥 Reçus
-        </button>
-        <button @click="showSent = true" class="px-4 py-2 rounded-xl text-sm font-medium transition-all"
-          :class="showSent ? 'bg-lavender/15 text-lavender border border-lavender/30' : 'text-text-muted border border-border hover:bg-surface2'">
-          📤 Envoyés
-        </button>
-      </div>
-
-      <!-- Send form -->
-      <div v-if="!showSent" class="moment-card bg-surface border border-border rounded-2xl p-4 mb-4">
-        <div class="flex gap-3">
-          <input v-model="newNote" @keyup.enter="sendNote" placeholder="Un petit mot doux..."
-            class="flex-1 bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-rose/50 transition-colors" />
-          <button @click="sendNote" :disabled="!newNote.trim()"
-            class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose to-lavender text-white font-semibold text-sm hover:scale-105 transition-transform disabled:opacity-50 flex items-center gap-1.5">
-            <Icon icon="lucide:send" class="w-4 h-4" />
-          </button>
+    <!-- ========= MESSAGES CHAT ========= -->
+    <div v-if="activeTab === 'notes'" class="flex flex-col" style="height: calc(100vh - 280px); min-height: 400px;">
+      <!-- Messages area -->
+      <div ref="chatRef" class="flex-1 overflow-y-auto space-y-5 mb-4 px-1 scroll-smooth">
+        <div v-if="chatMessages.length === 0" class="flex items-center justify-center h-full">
+          <div class="text-center text-text-muted">
+            <Icon icon="lucide:messages-square" class="w-12 h-12 mx-auto mb-3 opacity-30" />
+            <p class="text-sm">Pas encore de messages</p>
+            <p class="text-xs mt-1">Envoyez un premier message !</p>
+          </div>
         </div>
-      </div>
 
-      <div v-if="notes.length === 0" class="text-center py-8 text-text-muted">
-        <Icon icon="lucide:mail" class="w-10 h-10 mx-auto mb-2 opacity-40" />
-        <p>{{ showSent ? 'Aucun message envoyé' : 'Pas encore de message... glisse un petit mot !' }}</p>
-      </div>
-      <div v-else class="space-y-2">
-        <div v-for="n in notes" :key="n.id" class="moment-card bg-surface border rounded-2xl p-4"
-          :class="!n.read && !showSent ? 'border-rose/30 bg-rose/5' : 'border-border'">
-          <div class="flex items-start gap-3">
-            <div class="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold text-white flex-shrink-0"
-              :style="{ background: showSent ? account?.color : n.from_color || '#a78bfa' }">
-              {{ showSent ? n.to_name?.charAt(0) : n.from_name?.charAt(0) }}
+        <div v-for="group in groupedChat" :key="group.date" class="space-y-1">
+          <div class="flex justify-center mb-3">
+            <span class="text-[11px] text-text-muted bg-surface px-3 py-1 rounded-full border border-border">
+              {{ chatDate(group.date) }}
+            </span>
+          </div>
+
+          <div v-for="m in group.messages" :key="m.id"
+            class="flex gap-2.5"
+            :class="m.from_id === account.id ? 'justify-end' : 'justify-start'">
+            <div v-if="m.from_id !== account.id"
+              class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0 self-end"
+              :style="{ background: m.from_color || account.partner.color }">
+              {{ m.from_name?.charAt(0) }}
             </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-0.5">
-                <p class="text-sm font-semibold">{{ showSent ? 'À ' + n.to_name : n.from_name }}</p>
-                <span v-if="!showSent && !n.read" class="w-2 h-2 rounded-full bg-rose flex-shrink-0" />
+            <div class="max-w-[75%] sm:max-w-[65%]">
+              <div class="px-4 py-2.5 rounded-2xl text-sm leading-relaxed"
+                :class="m.from_id === account.id
+                  ? 'bg-gradient-to-r from-lavender to-rose text-white rounded-br-md'
+                  : 'bg-surface2 text-text border border-border rounded-bl-md'">
+                {{ m.message }}
               </div>
-              <p class="text-sm text-text leading-relaxed">{{ n.message }}</p>
-              <p class="text-[11px] text-text-muted mt-1.5">{{ new Date(n.created_at).toLocaleString('fr-FR') }}</p>
+              <div class="flex items-center gap-1.5 mt-0.5"
+                :class="m.from_id === account.id ? 'justify-end' : 'justify-start'">
+                <span class="text-[10px] text-text-muted">{{ chatTime(m.created_at) }}</span>
+                <Icon v-if="m.from_id === account.id && m.read" icon="lucide:check-check" class="w-3 h-3 text-lavender" />
+                <Icon v-else-if="m.from_id === account.id" icon="lucide:check" class="w-3 h-3 text-text-muted" />
+              </div>
+            </div>
+            <div v-if="m.from_id === account.id"
+              class="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold text-white flex-shrink-0 self-end"
+              :style="{ background: account.color }">
+              {{ account.name.charAt(0) }}
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Input -->
+      <div class="flex gap-2 flex-shrink-0 pt-3 border-t border-border">
+        <input v-model="newChatMsg" @keyup.enter="sendChatMessage"
+          placeholder="Écris un message..."
+          class="flex-1 bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-lavender/50 transition-colors" />
+        <button @click="sendChatMessage" :disabled="!newChatMsg.trim()"
+          class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm hover:scale-105 transition-transform disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-1.5">
+          <Icon icon="lucide:send" class="w-4 h-4" />
+        </button>
       </div>
     </div>
 
