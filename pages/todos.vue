@@ -191,7 +191,7 @@ onUnmounted(() => { ctx?.revert(); ScrollTrigger.getAll().forEach(t => t.kill())
                 </div>
               </div>
               <button @click.stop="handleDelete(todo.id)"
-                class="opacity-0 group-hover:opacity-100 text-text-muted hover:text-rose transition-all duration-200 text-xs p-1">
+                class="opacity-70 sm:opacity-0 sm:group-hover:opacity-100 text-text-muted hover:text-rose transition-all duration-200 text-xs p-1.5" aria-label="Supprimer">
                 <Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
               </button>
             </div>

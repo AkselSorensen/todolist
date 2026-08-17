@@ -1,12 +1,18 @@
-const CACHE = 'nousdeux-v3'
+const CACHE = 'nousdeux-v4'
+const OFFLINE_URL = '/'
 
-self.addEventListener('install', () => { self.skipWaiting() })
+self.addEventListener('install', (e) => {
+  self.skipWaiting()
+  e.waitUntil(
+    caches.open(CACHE).then(cache => cache.addAll([OFFLINE_URL, '/manifest.json'])).catch(() => {})
+  )
+})
 
 self.addEventListener('activate', (e) => {
   self.clients.claim()
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE && !k.startsWith('cdn-')).map(k => caches.delete(k)))
     )
   )
 })
@@ -19,8 +25,8 @@ self.addEventListener('push', (e) => {
     e.waitUntil(
       self.registration.showNotification(data.title, {
         body: data.body,
-        icon: data.icon || '/icons/icon.svg',
-        badge: '/icons/icon.svg',
+        icon: data.icon || '/icons/icon-192.png',
+        badge: '/icons/icon-192.png',
         vibrate: [200, 100, 200],
         data: { url: data.url || '/' },
         actions: data.actions || []
@@ -59,7 +65,13 @@ self.addEventListener('fetch', (e) => {
           }
           return res
         })
-        .catch(() => caches.match(e.request))
+        .catch(() =>
+          // Navigation request offline → fallback to cached home
+          (e.request.mode === 'navigate'
+            ? caches.match(OFFLINE_URL)
+            : caches.match(e.request))
+            .then(cached => cached || caches.match(OFFLINE_URL))
+        )
     )
     return
   }

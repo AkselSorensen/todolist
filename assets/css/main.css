@@ -18,12 +18,27 @@
 }
 
 /* Base */
+html {
+  color-scheme: dark;
+}
+
 body {
   background: var(--color-dark);
   color: var(--color-text);
   font-family: 'Inter', system-ui, sans-serif;
-  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
 }
+
+/* iOS safe areas (notch / home indicator) */
+.pt-safe { padding-top: env(safe-area-inset-top); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pb-safe-lg { padding-bottom: max(1.25rem, env(safe-area-inset-bottom)); }
+
+/* Prevent iOS text size auto-inflate on orientation change */
+html { -webkit-text-size-adjust: 100%; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }

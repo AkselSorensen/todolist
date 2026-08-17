@@ -29,6 +29,10 @@ export const useApi = () => {
     return await $fetch('/api/calendar', { method: 'POST', body: data })
   }
 
+  async function updateEvent(id: number, data: any) {
+    return await $fetch(`/api/calendar?id=${id}`, { method: 'PATCH', body: data })
+  }
+
   async function deleteEvent(id: number) {
     return await $fetch(`/api/calendar?id=${id}`, { method: 'DELETE' })
   }

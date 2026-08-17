@@ -65,6 +65,28 @@ export default defineEventHandler(async (e) => {
 
       return r.rows[0]
     }
+    if (method === 'PATCH') {
+      const { id } = getQuery(e)
+      if (!id) throw createError({ statusCode: 400, message: 'Missing id' })
+      const body = await readBody(e)
+      const allowed = ['title', 'description', 'event_type', 'start_time', 'end_time', 'all_day', 'alert_before', 'color', 'location']
+      const sets: string[] = []
+      const params: any[] = [id]
+      for (const k of allowed) {
+        if (body[k] !== undefined) {
+          params.push(body[k])
+          sets.push(`${k} = $${params.length}`)
+        }
+      }
+      if (!sets.length) throw createError({ statusCode: 400, message: 'Nothing to update' })
+      params.push(account.partnership_id)
+      const r = await query(
+        `UPDATE calendar_events SET ${sets.join(', ')} WHERE id = $1 AND partnership_id = $${params.length} RETURNING *`,
+        params
+      )
+      if (!r.rows.length) throw createError({ statusCode: 404, message: 'Event not found' })
+      return r.rows[0]
+    }
     if (method === 'DELETE') {
       const { id } = getQuery(e)
       if (!id) throw createError({ statusCode: 400 })

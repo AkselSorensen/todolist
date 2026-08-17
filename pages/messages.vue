@@ -215,7 +215,7 @@ onUnmounted(() => {
               <span v-if="m.edited" class="text-[10px] opacity-60 ml-1">(modifié)</span>
 
               <!-- Edit/delete on hover (own messages only) -->
-              <div v-if="m.from_id === myId" class="absolute -top-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 -translate-y-full">
+              <div v-if="m.from_id === myId" class="absolute -top-2 right-0 opacity-70 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex gap-0.5 -translate-y-full">
                 <button @click="startEdit(m)" class="w-6 h-6 rounded-lg bg-surface border border-border flex items-center justify-center hover:bg-surface2 transition-colors">
                   <Icon icon="lucide:pencil" class="w-3 h-3 text-text-muted" />
                 </button>

@@ -3,7 +3,7 @@ import { gsap } from 'gsap'
 
 definePageMeta({ layout: 'default' })
 
-const { fetchEvents, createEvent, deleteEvent, fetchUsers } = useApi()
+const { fetchEvents, createEvent, updateEvent, deleteEvent, fetchUsers } = useApi()
 
 const events = ref<any[]>([])
 const users = ref<any[]>([])
@@ -18,9 +18,10 @@ const currentMonth = ref(new Date().getMonth())
 const currentYear = ref(new Date().getFullYear())
 const today = new Date()
 
-// Multi-day range selection
-const rangeStart = ref<string | null>(null)
-const rangeEnd = ref<string | null>(null)
+// Day sheet (mobile-first : taper un jour → détails du jour)
+const showDaySheet = ref(false)
+const selectedDay = ref<Date | null>(null)
+const confirmingDelete = ref<number | null>(null)
 
 const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 const dayNames = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
@@ -39,33 +40,23 @@ const calendarDays = computed(() => {
   const firstDay = new Date(currentYear.value, currentMonth.value, 1)
   const lastDay = new Date(currentYear.value, currentMonth.value + 1, 0)
   const startOffset = (firstDay.getDay() + 6) % 7
-  const days: { date: Date; isCurrentMonth: boolean; isToday: boolean; isInRange: boolean; isRangeStart: boolean; isRangeEnd: boolean }[] = []
+  const days: { date: Date; isCurrentMonth: boolean; isToday: boolean }[] = []
 
   for (let i = startOffset - 1; i >= 0; i--) {
     const d = new Date(currentYear.value, currentMonth.value, -i)
-    days.push({ date: d, isCurrentMonth: false, isToday: isSameDay(d, today), ...rangeFlags(d) })
+    days.push({ date: d, isCurrentMonth: false, isToday: isSameDay(d, today) })
   }
   for (let i = 1; i <= lastDay.getDate(); i++) {
     const d = new Date(currentYear.value, currentMonth.value, i)
-    days.push({ date: d, isCurrentMonth: true, isToday: isSameDay(d, today), ...rangeFlags(d) })
+    days.push({ date: d, isCurrentMonth: true, isToday: isSameDay(d, today) })
   }
   while (days.length < 42) {
     const last = days[days.length - 1].date
     const d = new Date(last); d.setDate(d.getDate() + 1)
-    days.push({ date: d, isCurrentMonth: false, isToday: isSameDay(d, today), ...rangeFlags(d) })
+    days.push({ date: d, isCurrentMonth: false, isToday: isSameDay(d, today) })
   }
   return days
 })
-
-function rangeFlags(d: Date) {
-  const ds = toDateStr(d)
-  const inRange = rangeStart.value && rangeEnd.value && ds >= rangeStart.value && ds <= rangeEnd.value
-  return {
-    isInRange: !!inRange,
-    isRangeStart: rangeStart.value === ds,
-    isRangeEnd: rangeEnd.value === ds,
-  }
-}
 
 function isSameDay(a: Date, b: Date) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate() }
 function toDateStr(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
@@ -80,6 +71,8 @@ function getEventsForDay(date: Date) {
   })
 }
 
+function dayEventsCount(date: Date) { return getEventsForDay(date).length }
+
 function prevMonth() { if (currentMonth.value === 0) { currentMonth.value = 11; currentYear.value-- } else currentMonth.value-- }
 function nextMonth() { if (currentMonth.value === 11) { currentMonth.value = 0; currentYear.value++ } else currentMonth.value++ }
 
@@ -88,52 +81,52 @@ let ctx: gsap.Context | null = null
 
 async function loadData() {
   loading.value = true
+  // Range en dates locales (pas d'ISO UTC qui décale d'un jour)
   const startDate = new Date(currentYear.value, currentMonth.value - 1, 1)
   const endDate = new Date(currentYear.value, currentMonth.value + 2, 0)
-  const [e, u] = await Promise.allSettled([fetchEvents(startDate.toISOString(), endDate.toISOString()), fetchUsers()])
+  const [e, u] = await Promise.allSettled([fetchEvents(toDateStr(startDate), toDateStr(endDate)), fetchUsers()])
   events.value = e.status === 'fulfilled' ? (e.value || []) : []
   users.value = u.status === 'fulfilled' ? (u.value || []) : []
   loading.value = false
   await nextTick()
-  ctx?.revert()
-  ctx = gsap.context(() => {
-    gsap.fromTo('.cal-day', { autoAlpha: 0, scale: 0.94 }, { autoAlpha: 1, scale: 1, duration: 0.25, stagger: 0.008, ease: 'power2.out' })
-    gsap.fromTo('.event-row', { autoAlpha: 0, x: -12 }, { autoAlpha: 1, x: 0, duration: 0.3, stagger: 0.05, ease: 'power2.out', delay: 0.2 })
-  })
+  animateIn()
 }
 
+function animateIn() {
+  ctx?.revert()
+  // Pas d'animation sur mobile / reduced-motion : la grille reste visible
+  try {
+    if (window.matchMedia('(hover: none)').matches || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    ctx = gsap.context(() => {
+      gsap.from('.cal-day', { autoAlpha: 0, scale: 0.94, duration: 0.25, stagger: 0.005, ease: 'power2.out' })
+      if (document.querySelector('.event-row')) {
+        gsap.from('.event-row', { autoAlpha: 0, x: -12, duration: 0.3, stagger: 0.05, ease: 'power3.out', delay: 0.15 })
+      }
+    })
+  } catch { /* GSAP absent → contenu reste visible */ }
+}
+
+// Taper un jour → sheet du jour (pas de sélection de plage à 2 clics)
 function handleDayClick(date: Date) {
-  const ds = toDateStr(date)
+  selectedDay.value = date
+  confirmingDelete.value = null
+  showDaySheet.value = true
+}
 
-  // If no range started, or we're starting a new range
-  if (!rangeStart.value || (rangeStart.value && rangeEnd.value)) {
-    rangeStart.value = ds
-    rangeEnd.value = null
-    return
-  }
+const selectedDayEvents = computed(() => selectedDay.value ? getEventsForDay(selectedDay.value) : [])
 
-  // Second click: complete the range
-  if (ds < rangeStart.value) {
-    rangeEnd.value = rangeStart.value
-    rangeStart.value = ds
-  } else {
-    rangeEnd.value = ds
-  }
-
-  // Open modal with range pre-filled
-  selectedDate.value = rangeStart.value
-  selectedEndDate.value = rangeEnd.value
+function createOnSelectedDay() {
+  if (!selectedDay.value) return
+  selectedDate.value = toDateStr(selectedDay.value)
+  selectedEndDate.value = ''
   editingEvent.value = null
-  if (rangeStart.value !== rangeEnd.value) {
-    // Multi-day → pre-select trip type
-    editingEvent.value = null
-  }
+  showDaySheet.value = false
   showModal.value = true
 }
 
-function clearRange() {
-  rangeStart.value = null
-  rangeEnd.value = null
+function editFromSheet(evt: any) {
+  showDaySheet.value = false
+  openEditEvent(evt)
 }
 
 function openEditEvent(evt: any) {
@@ -142,8 +135,6 @@ function openEditEvent(evt: any) {
   editingEvent.value = { ...evt }
   selectedDate.value = start
   selectedEndDate.value = end !== start ? end : ''
-  rangeStart.value = start
-  rangeEnd.value = end !== start ? end : start
   showModal.value = true
 }
 
@@ -171,14 +162,45 @@ function onSubmitEvent() {
 }
 
 async function handleSave(data: any) {
-  if (editingEvent.value) await deleteEvent(editingEvent.value.id)
-  await createEvent(data)
+  try {
+    if (editingEvent.value) await updateEvent(editingEvent.value.id, data)
+    else await createEvent(data)
+  } catch (e: any) {
+    alert('Erreur : ' + (e?.data?.message || 'impossible de sauvegarder'))
+    return
+  }
   showModal.value = false; editingEvent.value = null
-  clearRange()
   await loadData()
 }
 
-async function handleDelete(id: number) { await deleteEvent(id); await loadData() }
+// Suppression en 2 temps (anti-erreur sur mobile) : 1er tap = confirmation
+function askDelete(id: number) {
+  confirmingDelete.value = confirmingDelete.value === id ? null : id
+}
+
+async function handleDelete(id: number) {
+  await deleteEvent(id)
+  confirmingDelete.value = null
+  await loadData()
+}
+
+function closeModal() {
+  showModal.value = false
+  editingEvent.value = null
+}
+
+const upcomingEvents = computed(() => {
+  const todayStr = toDateStr(new Date())
+  return events.value
+    .filter((e: any) => {
+      const start = e.start_time?.split('T')[0] || ''
+      const end = e.end_time?.split('T')[0] || ''
+      if (end && end !== start) return end >= todayStr // événement multi-jours pas terminé
+      return start >= todayStr
+    })
+    .sort((a: any, b: any) => (a.start_time || '').localeCompare(b.start_time || ''))
+    .slice(0, 20)
+})
 
 function formatTime(s: string) { if (!s) return ''; return new Date(s).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }
 function formatDateNice(s: string) { if (!s) return ''; return new Date(s).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) }
@@ -194,13 +216,13 @@ function formatDateRange(evt: any) {
   return new Date(start).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-watch([currentMonth, currentYear], () => { clearRange(); loadData() })
+watch([currentMonth, currentYear], () => loadData())
 onMounted(loadData)
 onUnmounted(() => ctx?.revert())
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto px-4 py-8">
+  <div class="max-w-6xl mx-auto px-4 py-6 sm:py-8">
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
       <div>
@@ -209,32 +231,25 @@ onUnmounted(() => ctx?.revert())
           Calendrier
         </h1>
         <p class="text-text-muted text-xs sm:text-sm mt-1">
-          <span v-if="rangeStart && !rangeEnd" class="text-lavender">Clique une 2ᵉ date pour définir une plage</span>
-          <span v-else>Nos disponibilités, sorties et rappels</span>
+          Nos disponibilités, sorties et rappels
           <NuxtLink to="/sync" class="ml-3 text-xs text-lavender hover:text-lavender-soft underline inline-flex items-center gap-1">
             <Icon icon="lucide:smartphone" class="w-3 h-3" /> Sync calendrier
           </NuxtLink>
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <button v-if="rangeStart || rangeEnd" @click="clearRange"
-          class="px-3 py-2 rounded-xl border border-border text-text-muted text-xs hover:bg-surface2 transition-colors">
-          <Icon icon="lucide:x" class="w-3 h-3 inline mr-1" />Annuler sélection
-        </button>
-        <button @click="showModal = true; editingEvent = null; selectedDate = toDateStr(new Date()); selectedEndDate = ''; clearRange()"
-          class="px-5 py-2.5 bg-gradient-to-r from-lavender to-rose rounded-xl text-white font-semibold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-lavender/20 flex items-center gap-2">
-          <Icon icon="lucide:plus" class="w-4 h-4" /> Nouvel événement
-        </button>
-      </div>
+      <button @click="showModal = true; editingEvent = null; selectedDate = toDateStr(new Date()); selectedEndDate = ''"
+        class="self-start sm:self-auto px-5 py-2.5 bg-gradient-to-r from-lavender to-rose rounded-xl text-white font-semibold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-lavender/20 flex items-center gap-2">
+        <Icon icon="lucide:plus" class="w-4 h-4" /> Nouvel événement
+      </button>
     </div>
 
     <!-- Month nav -->
     <div class="flex items-center justify-between mb-4">
-      <button @click="prevMonth" class="p-2.5 rounded-xl bg-surface border border-border text-text hover:bg-surface2 transition-colors">
+      <button @click="prevMonth" class="p-2.5 rounded-xl bg-surface border border-border text-text hover:bg-surface2 transition-colors" aria-label="Mois précédent">
         <Icon icon="lucide:chevron-left" class="w-4 h-4" />
       </button>
-      <h2 class="text-xl font-bold">{{ monthNames[currentMonth] }} {{ currentYear }}</h2>
-      <button @click="nextMonth" class="p-2.5 rounded-xl bg-surface border border-border text-text hover:bg-surface2 transition-colors">
+      <h2 class="text-lg sm:text-xl font-bold">{{ monthNames[currentMonth] }} {{ currentYear }}</h2>
+      <button @click="nextMonth" class="p-2.5 rounded-xl bg-surface border border-border text-text hover:bg-surface2 transition-colors" aria-label="Mois suivant">
         <Icon icon="lucide:chevron-right" class="w-4 h-4" />
       </button>
     </div>
@@ -242,24 +257,18 @@ onUnmounted(() => ctx?.revert())
     <!-- Calendar grid -->
     <div ref="calGridRef" class="bg-surface border border-border rounded-2xl overflow-hidden">
       <div class="grid grid-cols-7 border-b border-border">
-        <div v-for="day in dayNames" :key="day" class="p-3 text-center text-xs font-semibold text-text-muted">{{ day }}</div>
+        <div v-for="day in dayNames" :key="day" class="py-2 sm:p-3 text-center text-[10px] sm:text-xs font-semibold text-text-muted">{{ day }}</div>
       </div>
       <div class="grid grid-cols-7">
         <div v-for="(day, i) in calendarDays" :key="i" @click="handleDayClick(day.date)"
-          class="cal-day min-h-[60px] sm:min-h-[90px] p-1 sm:p-2 border-b border-r border-border/50 cursor-pointer hover:bg-surface2/50 transition-colors relative select-none"
-          :class="{
-            'opacity-30': !day.isCurrentMonth,
-            'bg-lavender/5': day.isToday && !day.isInRange,
-            'bg-lavender/10': day.isInRange,
-            'ring-1 ring-inset ring-lavender/40': day.isRangeStart || day.isRangeEnd,
-          }">
-          <div class="flex items-center justify-between mb-0.5 sm:mb-1">
-            <span class="text-[10px] sm:text-xs font-medium"
-              :class="day.isToday && !day.isInRange ? 'bg-lavender text-white w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center' : (day.isRangeStart || day.isRangeEnd ? 'text-lavender font-bold' : 'text-text-muted')">
+          class="cal-day min-h-[52px] sm:min-h-[90px] p-0.5 sm:p-2 border-b border-r border-border/50 cursor-pointer hover:bg-surface2/50 transition-colors relative select-none"
+          :class="{ 'opacity-30': !day.isCurrentMonth, 'bg-lavender/5': day.isToday }">
+          <div class="flex items-center justify-center sm:justify-between mb-0.5">
+            <span class="text-[11px] sm:text-xs font-medium w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center"
+              :class="day.isToday ? 'bg-lavender text-white rounded-full' : 'text-text-muted'">
               {{ day.date.getDate() }}
             </span>
-            <span v-if="day.isRangeStart" class="text-[8px] text-lavender font-semibold">DÉBUT</span>
-            <span v-else-if="day.isRangeEnd" class="text-[8px] text-lavender font-semibold">FIN</span>
+            <span v-if="dayEventsCount(day.date) > 0" class="hidden sm:inline text-[9px] text-text-muted">{{ dayEventsCount(day.date) }}</span>
           </div>
           <div class="space-y-0.5 hidden sm:block">
             <div v-for="evt in getEventsForDay(day.date).slice(0, 3)" :key="evt.id" @click.stop="openEditEvent(evt)"
@@ -269,13 +278,15 @@ onUnmounted(() => ctx?.revert())
               {{ evt.title }}
             </div>
           </div>
-          <div v-if="getEventsForDay(day.date).length > 0" class="sm:hidden flex justify-center gap-0.5 mt-0.5">
+          <!-- Mobile : pastilles colorées -->
+          <div v-if="dayEventsCount(day.date) > 0" class="sm:hidden flex justify-center gap-0.5 mt-1 flex-wrap px-0.5">
             <div v-for="(evt, ei) in getEventsForDay(day.date).slice(0, 4)" :key="ei"
-              class="w-1.5 h-1.5 rounded-full" :style="{ background: evt.color || '#a78bfa' }" />
+              class="w-1.5 h-1.5 rounded-full flex-shrink-0" :style="{ background: evt.color || '#a78bfa' }" />
           </div>
         </div>
       </div>
     </div>
+    <p class="text-center text-[11px] text-text-muted mt-2 sm:hidden">Tape sur un jour pour voir et ajouter des événements</p>
 
     <!-- Events list -->
     <div class="mt-8">
@@ -285,42 +296,95 @@ onUnmounted(() => ctx?.revert())
       <div v-if="loading" class="text-center py-12 text-text-muted">
         <Icon icon="lucide:loader-circle" class="w-8 h-8 mx-auto animate-spin mb-3" /> Chargement...
       </div>
-      <div v-else-if="events.length === 0" class="text-center py-12 text-text-muted bg-surface border border-border rounded-2xl">
-        <Icon icon="lucide:calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-40" /><p>Aucun événement</p>
+      <div v-else-if="upcomingEvents.length === 0" class="text-center py-12 text-text-muted bg-surface border border-border rounded-2xl">
+        <Icon icon="lucide:calendar-off" class="w-10 h-10 mx-auto mb-2 opacity-40" /><p>Aucun événement à venir</p>
       </div>
       <div v-else class="space-y-2">
         <TransitionGroup name="list">
-          <div v-for="evt in events.slice(0, 20)" :key="evt.id" @click="openEditEvent(evt)"
-            class="event-row flex items-center gap-4 p-4 bg-surface border border-border rounded-xl hover:border-lavender/30 transition-all duration-200 cursor-pointer group">
-            <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0" :style="{ background: (evt.color || '#a78bfa') + '15' }">
-              <Icon :icon="eventTypes[evt.event_type]?.icon || 'lucide:calendar'" class="w-5 h-5" :style="{ color: evt.color || '#a78bfa' }" />
+          <div v-for="evt in upcomingEvents" :key="evt.id" @click="openEditEvent(evt)"
+            class="event-row flex items-center gap-3 sm:gap-4 p-3 sm:p-4 bg-surface border border-border rounded-xl hover:border-lavender/30 transition-all duration-200 cursor-pointer group">
+            <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0" :style="{ background: (evt.color || '#a78bfa') + '15' }">
+              <Icon :icon="eventTypes[evt.event_type]?.icon || 'lucide:calendar'" class="w-4 h-4 sm:w-5 sm:h-5" :style="{ color: evt.color || '#a78bfa' }" />
             </div>
             <div class="flex-1 min-w-0">
-              <p class="font-medium text-sm">{{ evt.title }}</p>
-              <p v-if="evt.description" class="text-xs text-text-muted mt-0.5 truncate">{{ evt.description }}</p>
-              <p class="text-xs text-text-muted mt-1">{{ formatDateRange(evt) }}</p>
+              <p class="font-medium text-sm truncate">{{ evt.title }}</p>
+              <p class="text-xs text-text-muted mt-0.5">{{ formatDateRange(evt) }}<span v-if="formatTime(evt.start_time)"> · {{ formatTime(evt.start_time) }}</span></p>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="text-[10px] px-2 py-0.5 rounded-full border border-border text-text-muted flex items-center gap-1">
-                <Icon :icon="eventTypes[evt.event_type]?.icon || 'lucide:calendar'" class="w-3 h-3" />
-                {{ eventTypes[evt.event_type]?.label || 'Événement' }}
-              </span>
-              <button @click.stop="handleDelete(evt.id)"
-                class="opacity-0 group-hover:opacity-100 text-text-muted hover:text-rose transition-all duration-200 p-1">
-                <Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
-              </button>
-            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full border border-border text-text-muted items-center gap-1 hidden sm:flex">
+              <Icon :icon="eventTypes[evt.event_type]?.icon || 'lucide:calendar'" class="w-3 h-3" />
+              {{ eventTypes[evt.event_type]?.label || 'Événement' }}
+            </span>
+            <!-- Delete : toujours visible sur mobile, hover sur desktop -->
+            <button v-if="confirmingDelete === evt.id" @click.stop="handleDelete(evt.id)"
+              class="px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose text-xs font-semibold flex-shrink-0">
+              Confirmer ?
+            </button>
+            <button v-else @click.stop="askDelete(evt.id)"
+              class="text-text-muted hover:text-rose transition-all duration-200 p-1.5 flex-shrink-0 opacity-70 sm:opacity-0 sm:group-hover:opacity-100" aria-label="Supprimer">
+              <Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
+            </button>
           </div>
         </TransitionGroup>
       </div>
     </div>
 
-    <!-- Modal -->
+    <!-- Day sheet (mobile-first : détails du jour) -->
+    <Teleport to="body">
+      <Transition name="sheet">
+        <div v-if="showDaySheet" class="fixed inset-0 z-[90] flex items-end sm:items-center justify-center sm:p-4">
+          <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="showDaySheet = false" />
+          <div class="relative w-full sm:max-w-md bg-surface border-t sm:border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[80dvh] overflow-y-auto pb-safe-lg">
+            <div class="sticky top-0 bg-surface border-b border-border px-5 py-4 flex items-center justify-between z-10">
+              <div>
+                <p class="font-bold">{{ selectedDay ? formatDateNice(toDateStr(selectedDay)) : '' }}</p>
+                <p class="text-xs text-text-muted mt-0.5">{{ selectedDayEvents.length }} événement{{ selectedDayEvents.length > 1 ? 's' : '' }}</p>
+              </div>
+              <button @click="showDaySheet = false" class="p-2 rounded-xl hover:bg-surface2 transition-colors" aria-label="Fermer">
+                <Icon icon="lucide:x" class="w-4 h-4" />
+              </button>
+            </div>
+
+            <div class="p-5 space-y-2">
+              <div v-if="selectedDayEvents.length === 0" class="text-center py-8 text-text-muted">
+                <Icon icon="lucide:calendar-off" class="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p class="text-sm">Rien de prévu ce jour-là</p>
+              </div>
+              <div v-for="evt in selectedDayEvents" :key="evt.id" @click="editFromSheet(evt)"
+                class="flex items-center gap-3 p-3 rounded-xl border border-border bg-surface2/50 hover:border-lavender/30 transition-colors cursor-pointer">
+                <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0" :style="{ background: (evt.color || '#a78bfa') + '15' }">
+                  <Icon :icon="eventTypes[evt.event_type]?.icon || 'lucide:calendar'" class="w-4 h-4" :style="{ color: evt.color || '#a78bfa' }" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium truncate">{{ evt.title }}</p>
+                  <p class="text-[11px] text-text-muted truncate">
+                    {{ eventTypes[evt.event_type]?.label || 'Événement' }}<template v-if="formatTime(evt.start_time)"> · {{ formatTime(evt.start_time) }}</template>
+                  </p>
+                </div>
+                <button v-if="confirmingDelete === evt.id" @click.stop="handleDelete(evt.id)"
+                  class="px-2.5 py-1.5 rounded-lg bg-rose/15 text-rose text-xs font-semibold flex-shrink-0">
+                  Confirmer ?
+                </button>
+                <button v-else @click.stop="askDelete(evt.id)" class="p-1.5 text-text-muted hover:text-rose transition-colors flex-shrink-0" aria-label="Supprimer">
+                  <Icon icon="lucide:trash-2" class="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <button @click="createOnSelectedDay"
+                class="w-full py-3 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm flex items-center justify-center gap-2 mt-3">
+                <Icon icon="lucide:plus" class="w-4 h-4" /> Ajouter un événement ce jour
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Modal événement (bottom-sheet sur mobile) -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="showModal = false; clearRange()" />
-          <div class="relative bg-surface border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div v-if="showModal" class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center sm:p-4">
+          <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="closeModal" />
+          <div class="relative w-full sm:max-w-md bg-surface border-t sm:border border-border rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl max-h-[92dvh] overflow-y-auto pb-safe-lg">
             <h3 class="text-lg font-bold mb-4">
               {{ editingEvent ? 'Modifier' : (selectedEndDate ? 'Nouvel événement multi-jours' : 'Nouvel événement') }}
             </h3>
@@ -357,7 +421,7 @@ onUnmounted(() => ctx?.revert())
                 </div>
               </div>
               <div class="flex items-center gap-2">
-                <input type="checkbox" name="all_day" id="all_day_evt" :checked="editingEvent?.all_day" class="rounded" />
+                <input type="checkbox" name="all_day" id="all_day_evt" :checked="editingEvent?.all_day" class="rounded accent-lavender" />
                 <label for="all_day_evt" class="text-sm text-text-muted cursor-pointer">Toute la journée</label>
               </div>
               <div class="grid grid-cols-2 gap-3">
@@ -401,7 +465,7 @@ onUnmounted(() => ctx?.revert())
                 </select>
               </div>
               <div class="flex gap-3 pt-2">
-                <button type="button" @click="showModal = false; clearRange()"
+                <button type="button" @click="closeModal"
                   class="flex-1 py-2.5 rounded-xl border border-border text-text-muted text-sm hover:bg-surface2 transition-colors">Annuler</button>
                 <button type="submit"
                   class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm hover:scale-[1.02] transition-transform flex items-center justify-center gap-2">
@@ -424,4 +488,7 @@ onUnmounted(() => ctx?.revert())
 .modal-enter-active, .modal-leave-active { transition: all 0.25s ease; }
 .modal-enter-from, .modal-leave-to { opacity: 0; }
 .modal-enter-from > div:last-child, .modal-leave-to > div:last-child { transform: scale(0.95) translateY(10px); }
+.sheet-enter-active, .sheet-leave-active { transition: all 0.25s ease; }
+.sheet-enter-from, .sheet-leave-to { opacity: 0; }
+.sheet-enter-from > div:last-child, .sheet-leave-to > div:last-child { transform: translateY(100%); }
 </style>
