@@ -90,6 +90,7 @@ onMounted(async () => {
   initMiniMap()
 
   loadDashboardMoods()
+  loadAnniversary()
 
   ctx = gsap.context(() => {
     gsap.registerPlugin(ScrollTrigger)
@@ -204,6 +205,37 @@ async function loadDashboardMoods() {
   try { todayMoods.value = await $fetch('/api/moods') } catch { todayMoods.value = [] }
 }
 
+// Compteur de jours
+const anniversary = ref<any>(null)
+const showAnniversaryForm = ref(false)
+const annivFormRef = ref<HTMLFormElement | null>(null)
+
+async function loadAnniversary() {
+  try { anniversary.value = await $fetch('/api/anniversary') } catch { anniversary.value = null }
+}
+
+async function onSubmitAnniversary() {
+  if (!annivFormRef.value) return
+  const fd = new FormData(annivFormRef.value)
+  const started = (fd.get('started_at') as string) || ''
+  const firstDate = (fd.get('first_date_at') as string) || ''
+  try {
+    await $fetch('/api/anniversary', { method: 'PATCH', body: { started_at: started || null, first_date_at: firstDate || null } })
+  } catch (e: any) {
+    alert('Erreur : ' + (e?.data?.message || 'impossible de sauvegarder'))
+    return
+  }
+  showAnniversaryForm.value = false
+  await loadAnniversary()
+}
+
+function formatAnnivDate(date: string) {
+  if (!date) return ''
+  return new Date(date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function dayLabel(n: number) { return n === 1 ? 'jour' : 'jours' }
+
 async function quickSetMood(mood: string) {
   await $fetch('/api/moods', { method: 'POST', body: { mood } })
   await loadDashboardMoods()
@@ -228,6 +260,71 @@ function spinRoulette() {
         <span class="bg-gradient-to-r from-rose via-gold to-lavender bg-clip-text text-transparent">Nous Deux</span>
       </h1>
       <p class="text-text-muted text-sm sm:text-base">{{ subtitle }}</p>
+    </div>
+
+    <!-- Compteur de jours -->
+    <div class="mb-8">
+      <div class="relative bg-surface border border-border rounded-3xl overflow-hidden p-6 sm:p-8">
+        <div class="absolute inset-0 bg-gradient-to-br from-rose/10 via-transparent to-lavender/10 pointer-events-none" />
+
+        <!-- Pas encore de date -->
+        <div v-if="!anniversary?.started_at && !showAnniversaryForm" class="relative z-10 text-center py-4">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose to-lavender flex items-center justify-center mx-auto mb-3">
+            <Icon icon="lucide:heart" class="w-6 h-6 text-white" />
+          </div>
+          <h2 class="text-lg font-bold mb-1">Depuis quand tout a commencé ?</h2>
+          <p class="text-sm text-text-muted mb-4">Ajoutez la date de votre rencontre, le compteur s'occupe du reste</p>
+          <button @click="showAnniversaryForm = true"
+            class="px-5 py-2.5 bg-gradient-to-r from-rose to-lavender rounded-xl text-white font-semibold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-rose/20">
+            <Icon icon="lucide:calendar-heart" class="w-4 h-4 inline mr-1.5" /> Définir la date
+          </button>
+        </div>
+
+        <!-- Compteur -->
+        <div v-else-if="anniversary?.started_at" class="relative z-10 text-center">
+          <button @click="showAnniversaryForm = true" class="absolute top-0 right-0 p-2 rounded-xl text-text-muted hover:text-text hover:bg-surface2 transition-colors" aria-label="Modifier les dates">
+            <Icon icon="lucide:pencil" class="w-4 h-4" />
+          </button>
+          <div class="text-[11px] font-semibold uppercase tracking-widest text-text-muted mb-1 flex items-center justify-center gap-1.5">
+            <Icon icon="lucide:heart" class="w-3.5 h-3.5 text-rose" /> Ensemble depuis
+          </div>
+          <div class="text-6xl sm:text-7xl font-black bg-gradient-to-r from-rose via-gold to-lavender bg-clip-text text-transparent leading-none py-2">
+            {{ anniversary.days_together }}
+          </div>
+          <p class="text-sm text-text-muted mt-1">{{ dayLabel(anniversary.days_together) }} — depuis le {{ formatAnnivDate(anniversary.started_at) }}</p>
+
+          <div class="flex flex-wrap items-center justify-center gap-2 mt-4">
+            <span v-if="anniversary.first_date_at" class="text-xs px-3 py-1.5 rounded-full bg-surface2 border border-border text-text-muted">
+              Premier rendez-vous il y a {{ anniversary.days_since_first_date }} {{ dayLabel(anniversary.days_since_first_date) }}
+            </span>
+            <span v-if="anniversary.next_anniversary" class="text-xs px-3 py-1.5 rounded-full bg-rose/10 border border-rose/20 text-rose font-medium">
+              <Icon icon="lucide:sparkles" class="w-3 h-3 inline mr-1" />
+              <template v-if="anniversary.next_anniversary.days === 0">Aujourd'hui : {{ anniversary.next_anniversary.years }} {{ anniversary.next_anniversary.years > 1 ? 'ans' : 'an' }} !</template>
+              <template v-else>Dans {{ anniversary.next_anniversary.days }} {{ dayLabel(anniversary.next_anniversary.days) }} : {{ anniversary.next_anniversary.years }} {{ anniversary.next_anniversary.years > 1 ? 'ans' : 'an' }}</template>
+            </span>
+          </div>
+        </div>
+
+        <!-- Form -->
+        <form v-if="showAnniversaryForm" ref="annivFormRef" @submit.prevent="onSubmitAnniversary" class="relative z-10 max-w-md mx-auto space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-text-muted mb-1">Date de rencontre *</label>
+            <input type="date" name="started_at" required :value="anniversary?.started_at || ''"
+              class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-rose/50 transition-colors" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-text-muted mb-1">Premier rendez-vous</label>
+            <input type="date" name="first_date_at" :value="anniversary?.first_date_at || ''"
+              class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-rose/50 transition-colors" />
+          </div>
+          <div class="flex gap-3 pt-1">
+            <button type="button" @click="showAnniversaryForm = false"
+              class="flex-1 py-2.5 rounded-xl border border-border text-text-muted text-sm hover:bg-surface2 transition-colors">Annuler</button>
+            <button type="submit"
+              class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-rose to-lavender text-white font-semibold text-sm hover:scale-[1.02] transition-transform">Enregistrer</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <!-- Quick Actions — Amandine -->

@@ -9,6 +9,10 @@ export default defineEventHandler(async () => {
     )
   `)
 
+  // Compteur de jours : dates clés du couple (migration progressive)
+  await query(`ALTER TABLE partnerships ADD COLUMN IF NOT EXISTS started_at DATE`)
+  await query(`ALTER TABLE partnerships ADD COLUMN IF NOT EXISTS first_date_at DATE`)
+
   // Accounts (auth)
   await query(`
     CREATE TABLE IF NOT EXISTS accounts (

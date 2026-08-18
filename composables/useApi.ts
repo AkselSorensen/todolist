@@ -41,9 +41,17 @@ export const useApi = () => {
     return await $fetch('/api/users')
   }
 
+  async function fetchAnniversary() {
+    return await $fetch('/api/anniversary')
+  }
+
+  async function updateAnniversary(data: any) {
+    return await $fetch('/api/anniversary', { method: 'PATCH', body: data })
+  }
+
   async function setupDb() {
     return await $fetch('/api/setup', { method: 'POST' })
   }
 
-  return { fetchTodos, createTodo, updateTodo, deleteTodo, fetchEvents, createEvent, deleteEvent, fetchUsers, setupDb }
+  return { fetchTodos, createTodo, updateTodo, deleteTodo, fetchEvents, createEvent, updateEvent, deleteEvent, fetchUsers, fetchAnniversary, updateAnniversary, setupDb }
 }
