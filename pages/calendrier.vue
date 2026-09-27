@@ -216,6 +216,42 @@ function formatDateRange(evt: any) {
   return new Date(start).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
+// ---- Sync téléphone : abonnement au flux iCalendar /api/calendar.ics ----
+const showSyncSheet = ref(false)
+const isIOS = ref(false)
+const isAndroid = ref(false)
+const copiedLink = ref(false)
+
+// Origin résolu côté serveur (Vercel) puis côté client (fiabilité PWA)
+const requestOrigin = useRequestURL().origin
+const origin = ref(requestOrigin)
+onMounted(() => { if (window.location.origin) origin.value = window.location.origin })
+
+const icsUrl = computed(() => `${origin.value}/api/calendar.ics`)
+const icsDownloadUrl = computed(() => `${icsUrl.value}?download=1`)
+// webcal:// = schéma reconnu par iOS/macOS/Outlook pour s'abonner (et se resynchroniser tout seul)
+const webcalUrl = computed(() => icsUrl.value.replace(/^https?:\/\//, 'webcal://'))
+// Google Agenda : abonnement par URL (fonctionne depuis l'app Android)
+const googleUrl = computed(() => `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(webcalUrl.value)}`)
+
+function openSyncSheet() {
+  const ua = navigator.userAgent
+  isIOS.value = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  isAndroid.value = /Android/i.test(ua)
+  copiedLink.value = false
+  showSyncSheet.value = true
+}
+
+async function copyIcsLink() {
+  try {
+    await navigator.clipboard.writeText(icsUrl.value)
+    copiedLink.value = true
+    setTimeout(() => { copiedLink.value = false }, 2000)
+  } catch {
+    copiedLink.value = false
+  }
+}
+
 watch([currentMonth, currentYear], () => loadData())
 onMounted(loadData)
 onUnmounted(() => ctx?.revert())
@@ -232,15 +268,19 @@ onUnmounted(() => ctx?.revert())
         </h1>
         <p class="text-text-muted text-xs sm:text-sm mt-1">
           Nos disponibilités, sorties et rappels
-          <NuxtLink to="/sync" class="ml-3 text-xs text-lavender hover:text-lavender-soft underline inline-flex items-center gap-1">
-            <Icon icon="lucide:smartphone" class="w-3 h-3" /> Sync calendrier
-          </NuxtLink>
         </p>
       </div>
-      <button @click="showModal = true; editingEvent = null; selectedDate = toDateStr(new Date()); selectedEndDate = ''"
-        class="self-start sm:self-auto px-5 py-2.5 bg-gradient-to-r from-lavender to-rose rounded-xl text-white font-semibold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-lavender/20 flex items-center gap-2">
-        <Icon icon="lucide:plus" class="w-4 h-4" /> Nouvel événement
-      </button>
+      <div class="flex items-center gap-2 self-stretch sm:self-auto">
+        <button @click="openSyncSheet" aria-label="Synchroniser avec mon téléphone"
+          class="flex-1 sm:flex-none px-3 sm:px-4 py-2.5 rounded-xl bg-surface border border-border text-text hover:text-white hover:border-lavender/40 hover:bg-surface2 transition-colors font-semibold text-sm flex items-center justify-center gap-2">
+          <Icon icon="lucide:smartphone" class="w-4 h-4 text-lavender" />
+          <span class="sm:hidden">Sync tél.</span><span class="hidden sm:inline">Sync téléphone</span>
+        </button>
+        <button @click="showModal = true; editingEvent = null; selectedDate = toDateStr(new Date()); selectedEndDate = ''"
+          class="flex-1 sm:flex-none px-4 sm:px-5 py-2.5 bg-gradient-to-r from-lavender to-rose rounded-xl text-white font-semibold text-sm hover:scale-105 transition-transform duration-300 shadow-lg shadow-lavender/20 flex items-center justify-center gap-2">
+          <Icon icon="lucide:plus" class="w-4 h-4" /> <span class="hidden sm:inline">Nouvel événement</span><span class="sm:hidden">Nouveau</span>
+        </button>
+      </div>
     </div>
 
     <!-- Month nav -->
@@ -474,6 +514,125 @@ onUnmounted(() => ctx?.revert())
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Sheet Sync téléphone (abonnement iCalendar) -->
+    <Teleport to="body">
+      <Transition name="sheet">
+        <div v-if="showSyncSheet" class="fixed inset-0 z-[110] flex items-end sm:items-center justify-center sm:p-4">
+          <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="showSyncSheet = false" />
+          <div class="relative w-full sm:max-w-md bg-surface border-t sm:border border-border rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[90dvh] overflow-y-auto pb-safe-lg">
+            <div class="sticky top-0 bg-surface border-b border-border px-5 py-4 flex items-center justify-between z-10">
+              <div>
+                <p class="font-bold flex items-center gap-2">
+                  <Icon icon="lucide:smartphone" class="w-4 h-4 text-lavender" /> Synchroniser
+                </p>
+                <p class="text-xs text-text-muted mt-0.5">Notre calendrier dans l'agenda du téléphone</p>
+              </div>
+              <button @click="showSyncSheet = false" class="p-2 rounded-xl hover:bg-surface2 transition-colors" aria-label="Fermer">
+                <Icon icon="lucide:x" class="w-4 h-4" />
+              </button>
+            </div>
+
+            <div class="p-5 space-y-3">
+              <!-- Action principale : adaptée à la plateforme -->
+              <a v-if="isAndroid" :href="googleUrl" target="_blank" rel="noopener"
+                class="w-full py-3.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform">
+                <Icon icon="lucide:calendar-plus" class="w-4 h-4" /> Ajouter à Google Agenda
+              </a>
+              <a v-else :href="webcalUrl"
+                class="w-full py-3.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform">
+                <Icon icon="lucide:calendar-plus" class="w-4 h-4" />
+                {{ isIOS ? 'Ajouter à mon iPhone' : 'S\'abonner au calendrier' }}
+              </a>
+
+              <!-- Options secondaires -->
+              <a :href="icsDownloadUrl" download="nous-deux.ics"
+                class="flex items-center gap-3 p-3.5 rounded-xl bg-surface2/50 border border-border hover:border-lavender/30 transition-colors">
+                <div class="w-9 h-9 rounded-lg bg-lavender/15 flex items-center justify-center flex-shrink-0">
+                  <Icon icon="lucide:download" class="w-4 h-4 text-lavender" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium">Télécharger le fichier .ics</p>
+                  <p class="text-[11px] text-text-muted">Import ponctuel (Outlook, Samsung, autres apps)</p>
+                </div>
+                <Icon icon="lucide:chevron-right" class="w-4 h-4 text-text-muted flex-shrink-0" />
+              </a>
+
+              <a v-if="isAndroid" :href="webcalUrl"
+                class="flex items-center gap-3 p-3.5 rounded-xl bg-surface2/50 border border-border hover:border-lavender/30 transition-colors">
+                <div class="w-9 h-9 rounded-lg bg-mint/15 flex items-center justify-center flex-shrink-0">
+                  <Icon icon="lucide:calendar-days" class="w-4 h-4 text-mint" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium">Ouvrir avec une autre app</p>
+                  <p class="text-[11px] text-text-muted">Samsung Calendar, Proton…</p>
+                </div>
+                <Icon icon="lucide:chevron-right" class="w-4 h-4 text-text-muted flex-shrink-0" />
+              </a>
+
+              <a v-else :href="googleUrl" target="_blank" rel="noopener"
+                class="flex items-center gap-3 p-3.5 rounded-xl bg-surface2/50 border border-border hover:border-lavender/30 transition-colors">
+                <div class="w-9 h-9 rounded-lg bg-mint/15 flex items-center justify-center flex-shrink-0">
+                  <Icon icon="lucide:calendar-days" class="w-4 h-4 text-mint" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium">Ajouter à Google Agenda</p>
+                  <p class="text-[11px] text-text-muted">Sur ordinateur ou dans le navigateur</p>
+                </div>
+                <Icon icon="lucide:chevron-right" class="w-4 h-4 text-text-muted flex-shrink-0" />
+              </a>
+
+              <!-- Lien d'abonnement à copier -->
+              <div class="bg-surface2/50 border border-border rounded-xl p-3">
+                <div class="flex gap-2">
+                  <input :value="icsUrl" readonly aria-label="Lien d'abonnement au calendrier"
+                    class="flex-1 min-w-0 bg-transparent text-[11px] font-mono text-text-muted focus:outline-none"
+                    @focus="($event.target as HTMLInputElement)?.select()" />
+                  <button @click="copyIcsLink"
+                    class="px-3 py-1.5 rounded-lg bg-lavender/15 text-lavender border border-lavender/30 text-xs font-medium flex items-center gap-1.5 flex-shrink-0">
+                    <Icon :icon="copiedLink ? 'lucide:check' : 'lucide:copy'" class="w-3.5 h-3.5" /> {{ copiedLink ? 'Copié' : 'Copier' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Méthode manuelle -->
+              <details class="bg-surface2/40 border border-border rounded-xl px-4 py-3">
+                <summary class="text-xs font-semibold cursor-pointer select-none">Ajouter à la main (si le bouton ne s'ouvre pas)</summary>
+                <ol v-if="isIOS" class="mt-3 space-y-1.5 text-[11px] text-text-muted list-decimal list-inside">
+                  <li>Réglages → Calendrier → Comptes → Ajouter un compte</li>
+                  <li>Choisis <b>Autre</b> → <b>Ajouter un calendrier d'abonnement</b></li>
+                  <li>Colle le lien ci-dessus (sans le <b>?download=1</b>)</li>
+                </ol>
+                <ol v-else-if="isAndroid" class="mt-3 space-y-1.5 text-[11px] text-text-muted list-decimal list-inside">
+                  <li>Google Agenda → menu → <b>Paramètres</b></li>
+                  <li><b>Ajouter un calendrier</b> → <b>À partir d'une URL</b></li>
+                  <li>Colle le lien ci-dessus puis <b>S'abonner</b></li>
+                </ol>
+                <ol v-else class="mt-3 space-y-1.5 text-[11px] text-text-muted list-decimal list-inside">
+                  <li>Ouvre la page <b>Sync calendrier</b> (lien ci-dessous)</li>
+                  <li>Colle le lien ci-dessus dans <b>Outlook</b>, <b>Google Agenda</b> ou l'app Calendrier</li>
+                </ol>
+              </details>
+
+              <!-- À savoir -->
+              <div class="bg-gold/5 border border-gold/20 rounded-xl p-4 text-[11px] text-text-muted space-y-1.5">
+                <p class="font-semibold text-gold text-xs flex items-center gap-2">
+                  <Icon icon="lucide:info" class="w-3.5 h-3.5" /> À savoir
+                </p>
+                <p>Mise à jour automatique : 1 à 24 h selon l'app de calendrier.</p>
+                <p>Abonnement en <b>lecture seule</b> : les nouveaux événements s'ajoutent depuis Nous Deux et arrivent sur le téléphone.</p>
+                <p>Les alertes (15 min, 1 h, 1 jour avant) sont transmises au téléphone.</p>
+              </div>
+
+              <NuxtLink to="/sync" @click="showSyncSheet = false"
+                class="block text-center text-xs text-lavender hover:text-lavender-soft underline py-1">
+                Guide détaillé par appareil (Outlook, Google, iPhone, Android)
+              </NuxtLink>
+            </div>
           </div>
         </div>
       </Transition>
