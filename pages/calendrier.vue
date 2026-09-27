@@ -220,7 +220,10 @@ function formatDateRange(evt: any) {
 const showSyncSheet = ref(false)
 const isIOS = ref(false)
 const isAndroid = ref(false)
+const isStandalone = ref(false) // app installée (PWA) : iOS bloque webcal:// dans ce contexte
 const copiedLink = ref(false)
+const manualCopy = ref(false)
+const icsInputRef = ref<HTMLInputElement | null>(null)
 
 // Origin résolu côté serveur (Vercel) puis côté client (fiabilité PWA)
 const requestOrigin = useRequestURL().origin
@@ -238,18 +241,49 @@ function openSyncSheet() {
   const ua = navigator.userAgent
   isIOS.value = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   isAndroid.value = /Android/i.test(ua)
+  isStandalone.value = (navigator as any).standalone === true || window.matchMedia('(display-mode: standalone)').matches
   copiedLink.value = false
   showSyncSheet.value = true
 }
 
 async function copyIcsLink() {
+  const text = icsUrl.value
+  copiedLink.value = false
+  manualCopy.value = false
+
+  // 1) API moderne (contexte sécurisé + permission utilisateur)
   try {
-    await navigator.clipboard.writeText(icsUrl.value)
-    copiedLink.value = true
-    setTimeout(() => { copiedLink.value = false }, 2000)
-  } catch {
-    copiedLink.value = false
-  }
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      flashCopied()
+      return
+    }
+  } catch { /* on tente le repli */ }
+
+  // 2) Repli : sélection dans un champ caché + execCommand (Safari/PWA sans permission clipboard)
+  try {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.setAttribute('readonly', '')
+    ta.style.cssText = 'position:fixed;top:-1000px;left:0;opacity:0'
+    document.body.appendChild(ta)
+    ta.select()
+    ta.setSelectionRange(0, text.length)
+    const ok = document.execCommand('copy')
+    document.body.removeChild(ta)
+    if (ok) { flashCopied(); return }
+  } catch { /* on passe à la copie manuelle */ }
+
+  // 3) Copie impossible : on sélectionne le lien visible pour un appui long
+  manualCopy.value = true
+  await nextTick()
+  icsInputRef.value?.focus()
+  icsInputRef.value?.select()
+}
+
+function flashCopied() {
+  copiedLink.value = true
+  setTimeout(() => { copiedLink.value = false }, 2500)
 }
 
 watch([currentMonth, currentYear], () => loadData())
@@ -538,16 +572,36 @@ onUnmounted(() => ctx?.revert())
             </div>
 
             <div class="p-5 space-y-3">
-              <!-- Action principale : adaptée à la plateforme -->
+              <!-- Action principale : adaptée à la plateforme.
+                   iOS installé (PWA) : webcal:// ne s'ouvre pas -> on copie le lien + étapes Réglages -->
               <a v-if="isAndroid" :href="googleUrl" target="_blank" rel="noopener"
                 class="w-full py-3.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform">
                 <Icon icon="lucide:calendar-plus" class="w-4 h-4" /> Ajouter à Google Agenda
               </a>
+              <button v-else-if="isIOS && isStandalone" @click="copyIcsLink"
+                class="w-full py-3.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform">
+                <Icon :icon="copiedLink ? 'lucide:check' : 'lucide:copy'" class="w-4 h-4" />
+                {{ copiedLink ? 'Lien copié — suis les étapes' : 'Copier le lien du calendrier' }}
+              </button>
               <a v-else :href="webcalUrl"
                 class="w-full py-3.5 rounded-xl bg-gradient-to-r from-lavender to-rose text-white font-semibold text-sm flex items-center justify-center gap-2 hover:scale-[1.02] transition-transform">
                 <Icon icon="lucide:calendar-plus" class="w-4 h-4" />
                 {{ isIOS ? 'Ajouter à mon iPhone' : 'S\'abonner au calendrier' }}
               </a>
+
+              <!-- App installée sur iPhone : marche à suivre dédiée -->
+              <div v-if="isIOS && isStandalone" class="bg-mint/5 border border-mint/20 rounded-xl p-4 text-[11px] text-text-muted space-y-2">
+                <p class="font-semibold text-mint text-xs flex items-center gap-2">
+                  <Icon icon="lucide:app-window" class="w-3.5 h-3.5" /> App installée : passe par Réglages
+                </p>
+                <p>iOS n'autorise pas les liens de calendrier depuis une app installée. Copie le lien puis :</p>
+                <ol class="space-y-1 list-decimal list-inside">
+                  <li>Réglages → <b>Calendrier</b> → <b>Comptes</b></li>
+                  <li><b>Ajouter un compte</b> → <b>Autre</b></li>
+                  <li><b>Ajouter un calendrier d'abonnement</b> → colle le lien → <b>Suivant</b></li>
+                </ol>
+                <p>Astuce : la première fois, ouvre l'app depuis <b>Safari</b> (pas l'icône) — le bouton s'abonne alors tout seul.</p>
+              </div>
 
               <!-- Options secondaires -->
               <a :href="icsDownloadUrl" download="nous-deux.ics"
@@ -589,7 +643,7 @@ onUnmounted(() => ctx?.revert())
               <!-- Lien d'abonnement à copier -->
               <div class="bg-surface2/50 border border-border rounded-xl p-3">
                 <div class="flex gap-2">
-                  <input :value="icsUrl" readonly aria-label="Lien d'abonnement au calendrier"
+                  <input ref="icsInputRef" :value="icsUrl" readonly aria-label="Lien d'abonnement au calendrier"
                     class="flex-1 min-w-0 bg-transparent text-[11px] font-mono text-text-muted focus:outline-none"
                     @focus="($event.target as HTMLInputElement)?.select()" />
                   <button @click="copyIcsLink"
@@ -597,10 +651,13 @@ onUnmounted(() => ctx?.revert())
                     <Icon :icon="copiedLink ? 'lucide:check' : 'lucide:copy'" class="w-3.5 h-3.5" /> {{ copiedLink ? 'Copié' : 'Copier' }}
                   </button>
                 </div>
+                <p v-if="manualCopy" class="text-[11px] text-gold mt-2">
+                  Copie automatique bloquée — fais un appui long sur le lien, puis <b>Copier</b>.
+                </p>
               </div>
 
-              <!-- Méthode manuelle -->
-              <details class="bg-surface2/40 border border-border rounded-xl px-4 py-3">
+              <!-- Méthode manuelle (déjà détaillée dans le bloc "App installée" en PWA iOS) -->
+              <details v-if="!(isIOS && isStandalone)" class="bg-surface2/40 border border-border rounded-xl px-4 py-3">
                 <summary class="text-xs font-semibold cursor-pointer select-none">Ajouter à la main (si le bouton ne s'ouvre pas)</summary>
                 <ol v-if="isIOS" class="mt-3 space-y-1.5 text-[11px] text-text-muted list-decimal list-inside">
                   <li>Réglages → Calendrier → Comptes → Ajouter un compte</li>
