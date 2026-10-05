@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { gsap } from 'gsap'
 
+const props = withDefaults(defineProps<{ owner?: number | null; heading?: string }>(), {
+  owner: null,
+  heading: "Ce qu'on possède déjà",
+})
+
 const api = useApi()
 
 // Propriétaires possibles : soit Amandine, soit Aksel, soit en commun
@@ -33,7 +38,8 @@ const eur = (n: any) => new Intl.NumberFormat('fr-FR', { style: 'currency', curr
 
 async function load() {
   try {
-    assets.value = (await api.fetchBusinessAssets()) || []
+    assets.value = (await api.fetchBusinessAssets(props.owner ? { owner: props.owner } : undefined)) || []
+    errorMsg.value = ''
     errorMsg.value = ''
   } catch {
     assets.value = []
@@ -65,7 +71,7 @@ const groups = computed(() => OWNERS.map(o => {
 }).filter(g => g.items.length > 0))
 
 /* ---------- formulaire ---------- */
-const blank = () => ({ name: '', owner_id: 4 as number | null, category: 'crypto', value: 0, quantity: '', notes: '' })
+const blank = () => ({ name: '', owner_id: (props.owner ?? 4) as number | null, category: 'crypto', value: 0, quantity: '', notes: '' })
 const form = reactive(blank())
 
 function openCreate() {
@@ -124,7 +130,7 @@ async function removeAsset(id: number) {
       <div>
         <h2 class="text-base font-bold flex items-center gap-2">
           <Icon icon="lucide:wallet" class="w-4 h-4 text-gold" />
-          Ce qu'on possède déjà
+          {{ heading }}
         </h2>
         <p class="text-text-muted text-xs mt-0.5">
           {{ assets.length }} actif{{ assets.length > 1 ? 's' : '' }} · <b class="text-gold">{{ eur(total) }}</b> au total
@@ -155,7 +161,7 @@ async function removeAsset(id: number) {
     <!-- Groupes par propriétaire -->
     <div v-else class="space-y-4">
       <div v-for="g in groups" :key="String(g.id)" class="bg-surface border border-border rounded-xl overflow-hidden">
-        <div class="flex items-center justify-between gap-3 px-4 py-2.5 bg-surface2/50 border-b border-border">
+        <div v-if="!props.owner" class="flex items-center justify-between gap-3 px-4 py-2.5 bg-surface2/50 border-b border-border">
           <div class="flex items-center gap-2 min-w-0">
             <span class="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
               :style="{ background: g.color }">{{ g.name.charAt(0) }}</span>

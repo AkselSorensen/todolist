@@ -403,6 +403,27 @@ export default defineEventHandler(async () => {
   `)
   await query(`CREATE INDEX IF NOT EXISTS business_assets_partnership_idx ON business_assets (partnership_id)`)
 
+  // Objectifs par an (patrimoine, épargne, revenus)
+  await query(`
+    CREATE TABLE IF NOT EXISTS business_goals (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      owner_id INT REFERENCES accounts(id),
+      title TEXT NOT NULL,
+      metric TEXT NOT NULL DEFAULT 'custom',
+      target_amount NUMERIC(14,2) DEFAULT 0,
+      current_amount NUMERIC(14,2) DEFAULT 0,
+      year INT NOT NULL,
+      due_date DATE,
+      status TEXT NOT NULL DEFAULT 'active',
+      notes TEXT DEFAULT '',
+      created_by INT REFERENCES accounts(id),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await query(`CREATE INDEX IF NOT EXISTS business_goals_year_idx ON business_goals (partnership_id, year)`)
+
   // Trip proposals
   await query(`
     CREATE TABLE IF NOT EXISTS trip_proposals (

@@ -122,6 +122,26 @@ export const useApi = () => {
     return await $fetch(`/api/business-assets/${id}`, { method: 'DELETE' })
   }
 
+  // --- Objectifs par an ---
+  async function fetchBusinessGoals(filters?: { year?: number; owner?: string | number }) {
+    const params = new URLSearchParams()
+    if (filters?.year) params.set('year', String(filters.year))
+    if (filters?.owner !== undefined && filters?.owner !== '') params.set('owner', String(filters.owner))
+    return await $fetch(`/api/business-goals${params.toString() ? '?' + params : ''}`)
+  }
+
+  async function createBusinessGoal(data: any) {
+    return await $fetch('/api/business-goals', { method: 'POST', body: data })
+  }
+
+  async function updateBusinessGoal(id: number, data: any) {
+    return await $fetch(`/api/business-goals/${id}`, { method: 'PATCH', body: data })
+  }
+
+  async function deleteBusinessGoal(id: number) {
+    return await $fetch(`/api/business-goals/${id}`, { method: 'DELETE' })
+  }
+
   async function setupDb() {
     return await $fetch('/api/setup', { method: 'POST' })
   }
@@ -134,6 +154,7 @@ export const useApi = () => {
     fetchBusinessIdeas, createBusinessIdea, updateBusinessIdea, deleteBusinessIdea,
     createBusinessIdeaTask, updateBusinessIdeaTask, deleteBusinessIdeaTask,
     fetchBusinessAssets, createBusinessAsset, updateBusinessAsset, deleteBusinessAsset,
+    fetchBusinessGoals, createBusinessGoal, updateBusinessGoal, deleteBusinessGoal,
     setupDb,
   }
 }
