@@ -382,6 +382,26 @@ export default defineEventHandler(async () => {
     )
   `)
   await query(`CREATE INDEX IF NOT EXISTS business_idea_tasks_idea_idx ON business_idea_tasks (idea_id)`)
+  // Idée de boîte (company) ou placement (investment)
+  await query(`ALTER TABLE business_ideas ADD COLUMN IF NOT EXISTS domain TEXT NOT NULL DEFAULT 'company'`)
+
+  // Ce qu'on possède déjà (actifs, par personne ou en commun)
+  await query(`
+    CREATE TABLE IF NOT EXISTS business_assets (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      owner_id INT REFERENCES accounts(id),
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'other',
+      value NUMERIC(14,2) DEFAULT 0,
+      quantity NUMERIC(18,8),
+      notes TEXT DEFAULT '',
+      created_by INT REFERENCES accounts(id),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await query(`CREATE INDEX IF NOT EXISTS business_assets_partnership_idx ON business_assets (partnership_id)`)
 
   // Trip proposals
   await query(`

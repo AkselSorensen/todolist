@@ -71,8 +71,11 @@ export const useApi = () => {
   }
 
   // --- Business ideas (idées, quoi faire, combien d'argent) ---
-  async function fetchBusinessIdeas(stage?: string) {
-    return await $fetch(`/api/business-ideas${stage ? '?stage=' + encodeURIComponent(stage) : ''}`)
+  async function fetchBusinessIdeas(filters?: { stage?: string; domain?: string }) {
+    const params = new URLSearchParams()
+    if (filters?.stage) params.set('stage', filters.stage)
+    if (filters?.domain) params.set('domain', filters.domain)
+    return await $fetch(`/api/business-ideas${params.toString() ? '?' + params : ''}`)
   }
 
   async function createBusinessIdea(data: any) {
@@ -99,6 +102,26 @@ export const useApi = () => {
     return await $fetch(`/api/business-ideas/${ideaId}/tasks?id=${taskId}`, { method: 'DELETE' })
   }
 
+  // --- Ce qu'on possède déjà (actifs par personne ou en commun) ---
+  async function fetchBusinessAssets(filters?: { category?: string; owner?: string | number }) {
+    const params = new URLSearchParams()
+    if (filters?.category) params.set('category', filters.category)
+    if (filters?.owner !== undefined && filters?.owner !== '') params.set('owner', String(filters.owner))
+    return await $fetch(`/api/business-assets${params.toString() ? '?' + params : ''}`)
+  }
+
+  async function createBusinessAsset(data: any) {
+    return await $fetch('/api/business-assets', { method: 'POST', body: data })
+  }
+
+  async function updateBusinessAsset(id: number, data: any) {
+    return await $fetch(`/api/business-assets/${id}`, { method: 'PATCH', body: data })
+  }
+
+  async function deleteBusinessAsset(id: number) {
+    return await $fetch(`/api/business-assets/${id}`, { method: 'DELETE' })
+  }
+
   async function setupDb() {
     return await $fetch('/api/setup', { method: 'POST' })
   }
@@ -110,6 +133,7 @@ export const useApi = () => {
     fetchBusinessDates, createBusinessDate, updateBusinessDate, deleteBusinessDate,
     fetchBusinessIdeas, createBusinessIdea, updateBusinessIdea, deleteBusinessIdea,
     createBusinessIdeaTask, updateBusinessIdeaTask, deleteBusinessIdeaTask,
+    fetchBusinessAssets, createBusinessAsset, updateBusinessAsset, deleteBusinessAsset,
     setupDb,
   }
 }

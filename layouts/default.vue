@@ -8,7 +8,7 @@
           </div>
           <span class="hidden sm:inline text-base sm:text-lg font-bold text-text">Nous Deux</span>
         </NuxtLink>
-        <div class="flex items-center gap-0.5 sm:gap-1.5 min-w-0">
+        <div class="flex items-center gap-0.5 sm:gap-1.5 max-[360px]:gap-0 min-w-0">
           <NuxtLink to="/todos" class="px-1.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
             :class="$route.path === '/todos' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
             <Icon icon="lucide:list-todo" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden lg:inline">Tâches</span>

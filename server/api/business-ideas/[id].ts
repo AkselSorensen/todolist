@@ -1,6 +1,6 @@
 import { query } from '../../utils/db'
 import { getCurrentAccount } from '../../utils/auth'
-import { ensureBusinessIdeasTable, IDEA_MONEY, IDEA_STAGES, IDEA_EFFORTS, IDEA_FIELDS } from '../../utils/businessIdeas'
+import { ensureBusinessIdeasTable, IDEA_MONEY, IDEA_STAGES, IDEA_EFFORTS, IDEA_DOMAINS, IDEA_FIELDS } from '../../utils/businessIdeas'
 
 export default defineEventHandler(async (e) => {
   const account = await getCurrentAccount(e)
@@ -12,7 +12,7 @@ export default defineEventHandler(async (e) => {
 
   if (e.method === 'GET') {
     const r = await query(
-      `SELECT i.id, i.title, i.pitch, i.stage, i.effort, i.next_step, i.link,
+      `SELECT i.id, i.title, i.pitch, i.stage, i.effort, i.next_step, i.link, i.domain,
               i.partnership_id, i.created_by, i.created_at, i.updated_at, ${IDEA_MONEY}
        FROM business_ideas i
        WHERE i.id = $1 AND i.partnership_id = $2`, [id, account.partnership_id])
@@ -32,6 +32,7 @@ export default defineEventHandler(async (e) => {
       if (!IDEA_FIELDS.includes(k)) continue
       if (k === 'stage' && !IDEA_STAGES.includes(v as any)) continue
       if (k === 'effort' && !IDEA_EFFORTS.includes(v as any)) continue
+      if (k === 'domain' && !IDEA_DOMAINS.includes(v as any)) continue
       if (k === 'title' && !String(v || '').trim()) continue
       if (['invested', 'monthly_target', 'earned'].includes(k)) {
         params.push(Number.isFinite(+v) ? Math.max(0, +v) : 0)

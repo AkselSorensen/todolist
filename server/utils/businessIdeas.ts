@@ -37,6 +37,8 @@ async function create() {
   // Migrations additives (safe sur base existante)
   await query(`ALTER TABLE business_ideas ADD COLUMN IF NOT EXISTS link TEXT DEFAULT ''`)
   await query(`ALTER TABLE business_ideas ADD COLUMN IF NOT EXISTS effort TEXT NOT NULL DEFAULT 'medium'`)
+  // Domaine : une idée de boîte (company) ou un placement (investment)
+  await query(`ALTER TABLE business_ideas ADD COLUMN IF NOT EXISTS domain TEXT NOT NULL DEFAULT 'company'`)
 }
 
 export function ensureBusinessIdeasTable() {
@@ -49,5 +51,6 @@ export const IDEA_MONEY = `invested::float8 AS invested, monthly_target::float8 
 
 export const IDEA_STAGES = ['idea', 'studying', 'building', 'launched', 'dropped'] as const
 export const IDEA_EFFORTS = ['low', 'medium', 'high'] as const
+export const IDEA_DOMAINS = ['company', 'investment'] as const
 
-export const IDEA_FIELDS = ['title', 'pitch', 'stage', 'effort', 'invested', 'monthly_target', 'earned', 'next_step', 'link']
+export const IDEA_FIELDS = ['title', 'pitch', 'stage', 'effort', 'invested', 'monthly_target', 'earned', 'next_step', 'link', 'domain']

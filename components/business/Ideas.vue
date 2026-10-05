@@ -1,8 +1,24 @@
 <script setup lang="ts">
 import { gsap } from 'gsap'
 
+const props = withDefaults(defineProps<{ domain?: 'company' | 'investment' }>(), { domain: 'company' })
+
 const api = useApi()
-const account = { id: 4, name: 'Aksel', partner: { id: 5, name: 'Amandine' } }
+
+// La même section sert les idées de boîte (Entreprise) et les pistes de placement (Investissement)
+const L = computed(() => props.domain === 'investment' ? {
+  count: 'Placements suivis', invested: 'Capital engagé', monthly: 'Rendement / mois', earned: 'Déjà perçu',
+  investedShort: 'Capital', earnedShort: 'Perçu', monthlyField: 'Rendement / mois',
+  titleLabel: 'Placement *', newTitle: 'Nouvelle piste', editTitle: 'Modifier la piste',
+  placeholder: 'ETF monde, SCPI, Bitcoin...', empty: 'Note ta première piste de placement.',
+  cta: 'Nouvelle piste', icon: 'lucide:trending-up', listTitle: 'Pistes de placement',
+} : {
+  count: 'Idées suivies', invested: 'Investi', monthly: 'Potentiel / mois', earned: 'Déjà gagné',
+  investedShort: 'Investi', earnedShort: 'Gagné', monthlyField: 'Potentiel / mois',
+  titleLabel: 'Idée *', newTitle: 'Nouvelle idée', editTitle: "Modifier l'idée",
+  placeholder: 'App de réservation pour hôtels indépendants', empty: 'Note ta première idée : quoi faire, et combien ça peut rapporter.',
+  cta: 'Nouvelle idée', icon: 'lucide:lightbulb', listTitle: 'Idées de boîte',
+})
 
 const ideas = ref<any[]>([])
 const loading = ref(true)
@@ -15,20 +31,34 @@ const openId = ref<number | null>(null)
 const pendingDelete = ref<number | null>(null)
 const draft: Record<number, string> = reactive({})
 
-const STAGES = [
-  { key: 'idea', label: 'Idée', icon: 'lucide:lightbulb', class: 'bg-gold/15 text-gold border-gold/25', dot: 'bg-gold' },
-  { key: 'studying', label: "À l'étude", icon: 'lucide:search', class: 'bg-lavender/15 text-lavender border-lavender/25', dot: 'bg-lavender' },
-  { key: 'building', label: 'En construction', icon: 'lucide:hammer', class: 'bg-rose/15 text-rose border-rose/25', dot: 'bg-rose' },
-  { key: 'launched', label: 'Lancée', icon: 'lucide:rocket', class: 'bg-mint/15 text-mint border-mint/25', dot: 'bg-mint' },
-  { key: 'dropped', label: 'Abandonnée', icon: 'lucide:archive', class: 'bg-surface2 text-text-muted border-border', dot: 'bg-text-muted' },
+const COMPANY_STAGES = [
+  { key: 'idea', label: 'Idée', icon: 'lucide:lightbulb', class: 'bg-gold/15 text-gold border-gold/25' },
+  { key: 'studying', label: "À l'étude", icon: 'lucide:search', class: 'bg-lavender/15 text-lavender border-lavender/25' },
+  { key: 'building', label: 'En construction', icon: 'lucide:hammer', class: 'bg-rose/15 text-rose border-rose/25' },
+  { key: 'launched', label: 'Lancée', icon: 'lucide:rocket', class: 'bg-mint/15 text-mint border-mint/25' },
+  { key: 'dropped', label: 'Abandonnée', icon: 'lucide:archive', class: 'bg-surface2 text-text-muted border-border' },
 ]
-const EFFORTS = [
+const INVESTMENT_STAGES = [
+  { key: 'idea', label: 'Piste', icon: 'lucide:lightbulb', class: 'bg-gold/15 text-gold border-gold/25' },
+  { key: 'studying', label: "À l'étude", icon: 'lucide:search', class: 'bg-lavender/15 text-lavender border-lavender/25' },
+  { key: 'building', label: 'En cours', icon: 'lucide:hourglass', class: 'bg-rose/15 text-rose border-rose/25' },
+  { key: 'launched', label: 'Actif', icon: 'lucide:trending-up', class: 'bg-mint/15 text-mint border-mint/25' },
+  { key: 'dropped', label: 'Abandonné', icon: 'lucide:archive', class: 'bg-surface2 text-text-muted border-border' },
+]
+const COMPANY_EFFORTS = [
   { key: 'low', label: 'Charge faible', icon: 'lucide:leaf' },
   { key: 'medium', label: 'Charge moyenne', icon: 'lucide:gauge' },
   { key: 'high', label: 'Charge élevée', icon: 'lucide:flame' },
 ]
-const stageOf = (k: string) => STAGES.find(s => s.key === k) || STAGES[0]
-const effortOf = (k: string) => EFFORTS.find(s => s.key === k) || EFFORTS[1]
+const INVESTMENT_EFFORTS = [
+  { key: 'low', label: 'Petit ticket', icon: 'lucide:leaf' },
+  { key: 'medium', label: 'Ticket moyen', icon: 'lucide:gauge' },
+  { key: 'high', label: 'Gros ticket', icon: 'lucide:flame' },
+]
+const STAGES = computed(() => props.domain === 'investment' ? INVESTMENT_STAGES : COMPANY_STAGES)
+const EFFORTS = computed(() => props.domain === 'investment' ? INVESTMENT_EFFORTS : COMPANY_EFFORTS)
+const stageOf = (k: string) => STAGES.value.find(s => s.key === k) || STAGES.value[0]
+const effortOf = (k: string) => EFFORTS.value.find(s => s.key === k) || EFFORTS.value[1]
 
 const eur = (n: any) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Number(n) || 0)
 
@@ -57,7 +87,7 @@ const taskStats = (idea: any) => {
 /* ---------- data ---------- */
 async function load() {
   try {
-    ideas.value = (await api.fetchBusinessIdeas()) || []
+    ideas.value = (await api.fetchBusinessIdeas({ domain: props.domain })) || []
     errorMsg.value = ''
   } catch {
     ideas.value = []
@@ -111,7 +141,7 @@ defineExpose({ openCreate })
 async function onSubmit() {
   if (!form.title.trim() || saving.value) return
   const payload = {
-    title: form.title.trim(), pitch: form.pitch, stage: form.stage, effort: form.effort,
+    title: form.title.trim(), pitch: form.pitch, stage: form.stage, effort: form.effort, domain: props.domain,
     invested: Number(form.invested) || 0, monthly_target: Number(form.monthly_target) || 0,
     earned: Number(form.earned) || 0, next_step: form.next_step, link: form.link,
   }
@@ -187,7 +217,7 @@ async function removeTask(idea: any, task: any) {
         </div>
         <div class="min-w-0">
           <p class="text-xl font-bold leading-none">{{ totals.count }}</p>
-          <p class="text-[11px] text-text-muted truncate mt-1">Idées suivies</p>
+          <p class="text-[11px] text-text-muted truncate mt-1">{{ L.count }}</p>
         </div>
       </div>
       <div class="stat-card bg-surface border border-border rounded-xl p-4 flex items-center gap-3">
@@ -196,7 +226,7 @@ async function removeTask(idea: any, task: any) {
         </div>
         <div class="min-w-0">
           <p class="text-xl font-bold leading-none truncate">{{ eur(totals.invested) }}</p>
-          <p class="text-[11px] text-text-muted truncate mt-1">Investi</p>
+          <p class="text-[11px] text-text-muted truncate mt-1">{{ L.invested }}</p>
         </div>
       </div>
       <div class="stat-card bg-surface border border-border rounded-xl p-4 flex items-center gap-3">
@@ -205,7 +235,7 @@ async function removeTask(idea: any, task: any) {
         </div>
         <div class="min-w-0">
           <p class="text-xl font-bold leading-none truncate">{{ eur(totals.monthly) }}</p>
-          <p class="text-[11px] text-text-muted truncate mt-1">Potentiel / mois</p>
+          <p class="text-[11px] text-text-muted truncate mt-1">{{ L.monthly }}</p>
         </div>
       </div>
       <div class="stat-card bg-surface border border-border rounded-xl p-4 flex items-center gap-3">
@@ -214,7 +244,7 @@ async function removeTask(idea: any, task: any) {
         </div>
         <div class="min-w-0">
           <p class="text-xl font-bold leading-none truncate">{{ eur(totals.earned) }}</p>
-          <p class="text-[11px] text-text-muted truncate mt-1">Déjà gagné</p>
+          <p class="text-[11px] text-text-muted truncate mt-1">{{ L.earned }}</p>
         </div>
       </div>
     </div>
@@ -242,15 +272,15 @@ async function removeTask(idea: any, task: any) {
     <!-- Vide -->
     <div v-else-if="filtered.length === 0" class="text-center py-16">
       <div class="w-16 h-16 rounded-2xl bg-lavender/10 flex items-center justify-center mx-auto mb-4">
-        <Icon icon="lucide:lightbulb" class="w-8 h-8 text-lavender" />
+        <Icon :icon="L.icon" class="w-8 h-8 text-lavender" />
       </div>
       <h3 class="text-xl font-bold mb-2">Aucune idée</h3>
       <p class="text-text-muted mb-6">
-        {{ activeStage === 'all' ? 'Note ta première idée : quoi faire, et combien ça peut rapporter.' : 'Rien sur ce filtre — essaie « Toutes ».' }}
+        {{ activeStage === 'all' ? L.empty : 'Rien sur ce filtre — essaie « Toutes ».' }}
       </p>
       <button @click="openCreate"
         class="px-5 py-2.5 bg-gradient-to-r from-rose to-lavender rounded-xl text-white font-semibold text-sm flex items-center gap-2 mx-auto">
-        <Icon icon="lucide:plus" class="w-4 h-4" /> Nouvelle idée
+        <Icon icon="lucide:plus" class="w-4 h-4" /> {{ L.cta }}
       </button>
     </div>
 
@@ -277,14 +307,14 @@ async function removeTask(idea: any, task: any) {
 
             <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2.5 text-[11px]">
               <span class="flex items-center gap-1.5 text-text-muted">
-                <Icon icon="lucide:piggy-bank" class="w-3.5 h-3.5" /> Investi
+                <Icon icon="lucide:piggy-bank" class="w-3.5 h-3.5" /> {{ L.investedShort }}
                 <b class="text-text">{{ eur(it.invested) }}</b>
               </span>
               <span class="flex items-center gap-1.5 text-mint">
                 <Icon icon="lucide:trending-up" class="w-3.5 h-3.5" /> <b>{{ eur(it.monthly_target) }}</b> / mois
               </span>
               <span class="flex items-center gap-1.5 text-gold">
-                <Icon icon="lucide:circle-dollar-sign" class="w-3.5 h-3.5" /> Gagné <b>{{ eur(it.earned) }}</b>
+                <Icon icon="lucide:circle-dollar-sign" class="w-3.5 h-3.5" /> {{ L.earnedShort }} <b>{{ eur(it.earned) }}</b>
               </span>
               <span v-if="payback(it)" class="flex items-center gap-1.5 text-lavender">
                 <Icon icon="lucide:calculator" class="w-3.5 h-3.5" /> Rentable dans ~{{ payback(it) }} mois
@@ -373,14 +403,14 @@ async function removeTask(idea: any, task: any) {
           <div class="absolute inset-0 bg-dark/80 backdrop-blur-sm" @click="showModal = false" />
           <div class="relative w-full sm:max-w-lg bg-surface border-t sm:border border-border rounded-t-2xl sm:rounded-2xl p-6 shadow-2xl max-h-[92dvh] overflow-y-auto pb-safe-lg">
             <h3 class="text-lg font-bold mb-4 flex items-center gap-2">
-              <Icon icon="lucide:lightbulb" class="w-5 h-5 text-lavender" />
-              {{ editing ? "Modifier l'idée" : 'Nouvelle idée' }}
+              <Icon :icon="L.icon" class="w-5 h-5 text-lavender" />
+              {{ editing ? L.editTitle : L.newTitle }}
             </h3>
 
             <form @submit.prevent="onSubmit" class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-text-muted mb-1">Idée *</label>
-                <input v-model="form.title" required placeholder="App de réservation pour hôtels indépendants"
+                <label class="block text-sm font-medium text-text-muted mb-1">{{ L.titleLabel }}</label>
+                <input v-model="form.title" required :placeholder="L.placeholder"
                   class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-rose/50 transition-colors" />
               </div>
 
@@ -398,7 +428,7 @@ async function removeTask(idea: any, task: any) {
                   </select>
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-text-muted mb-1">Charge</label>
+                  <label class="block text-sm font-medium text-text-muted mb-1">{{ props.domain === 'investment' ? 'Ticket' : 'Charge' }}</label>
                   <select v-model="form.effort" class="w-full bg-surface2 border border-border rounded-xl px-4 py-2.5 text-text text-sm focus:outline-none focus:border-rose/50">
                     <option v-for="s in EFFORTS" :key="s.key" :value="s.key">{{ s.label }}</option>
                   </select>
@@ -411,17 +441,17 @@ async function removeTask(idea: any, task: any) {
                 </p>
                 <div class="grid grid-cols-3 gap-2">
                   <div>
-                    <label class="block text-[11px] text-text-muted mb-1">Investi (€)</label>
+                    <label class="block text-[11px] text-text-muted mb-1">{{ L.investedShort }} (€)</label>
                     <input v-model="form.invested" type="number" min="0" step="10"
                       class="w-full bg-surface border border-border rounded-lg px-3 py-2 text-text text-sm focus:outline-none focus:border-rose/50" />
                   </div>
                   <div>
-                    <label class="block text-[11px] text-text-muted mb-1">Potentiel / mois</label>
+                    <label class="block text-[11px] text-text-muted mb-1">{{ L.monthlyField }}</label>
                     <input v-model="form.monthly_target" type="number" min="0" step="10"
                       class="w-full bg-surface border border-border rounded-lg px-3 py-2 text-text text-sm focus:outline-none focus:border-rose/50" />
                   </div>
                   <div>
-                    <label class="block text-[11px] text-text-muted mb-1">Déjà gagné (€)</label>
+                    <label class="block text-[11px] text-text-muted mb-1">{{ L.earnedShort }} (€)</label>
                     <input v-model="form.earned" type="number" min="0" step="10"
                       class="w-full bg-surface border border-border rounded-lg px-3 py-2 text-text text-sm focus:outline-none focus:border-rose/50" />
                   </div>

@@ -1,6 +1,6 @@
 import { query } from '../../utils/db'
 import { getCurrentAccount } from '../../utils/auth'
-import { ensureBusinessIdeasTable, IDEA_MONEY, IDEA_STAGES, IDEA_EFFORTS } from '../../utils/businessIdeas'
+import { ensureBusinessIdeasTable, IDEA_MONEY, IDEA_STAGES, IDEA_EFFORTS, IDEA_DOMAINS } from '../../utils/businessIdeas'
 
 export default defineEventHandler(async (e) => {
   const account = await getCurrentAccount(e)
@@ -8,9 +8,9 @@ export default defineEventHandler(async (e) => {
   await ensureBusinessIdeasTable()
 
   if (e.method === 'GET') {
-    const { stage } = getQuery(e)
+    const { stage, domain } = getQuery(e)
     let sql = `
-      SELECT i.id, i.title, i.pitch, i.stage, i.effort, i.next_step, i.link,
+      SELECT i.id, i.title, i.pitch, i.stage, i.effort, i.next_step, i.link, i.domain,
              i.partnership_id, i.created_by, i.created_at, i.updated_at,
              ${IDEA_MONEY},
              a.name as owner_name, a.color as owner_color
@@ -20,6 +20,7 @@ export default defineEventHandler(async (e) => {
     `
     const params: any[] = [account.partnership_id]
     if (stage) { params.push(stage); sql += ` AND i.stage = $${params.length}` }
+    if (domain) { params.push(domain); sql += ` AND i.domain = $${params.length}` }
     sql += ' ORDER BY i.created_at DESC'
 
     const ideas = (await query(sql, params)).rows
@@ -46,15 +47,16 @@ export default defineEventHandler(async (e) => {
     }
     const stage = IDEA_STAGES.includes(b.stage) ? b.stage : 'idea'
     const effort = IDEA_EFFORTS.includes(b.effort) ? b.effort : 'medium'
+    const domain = IDEA_DOMAINS.includes(b.domain) ? b.domain : 'company'
     const num = (v: any) => (Number.isFinite(+v) ? Math.max(0, +v) : 0)
     const r = await query(
       `INSERT INTO business_ideas
-         (partnership_id, created_by, title, pitch, stage, effort, invested, monthly_target, earned, next_step, link)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       RETURNING id, title, pitch, stage, effort, next_step, link, partnership_id, created_by, created_at, updated_at, ${IDEA_MONEY}`,
+         (partnership_id, created_by, title, pitch, stage, effort, invested, monthly_target, earned, next_step, link, domain)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       RETURNING id, title, pitch, stage, effort, next_step, link, domain, partnership_id, created_by, created_at, updated_at, ${IDEA_MONEY}`,
       [
         account.partnership_id, account.id, String(b.title).trim(), b.pitch || '', stage, effort,
-        num(b.invested), num(b.monthly_target), num(b.earned), b.next_step || '', b.link || '',
+        num(b.invested), num(b.monthly_target), num(b.earned), b.next_step || '', b.link || '', domain,
       ]
     )
     const idea = r.rows[0]
