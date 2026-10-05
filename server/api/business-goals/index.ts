@@ -1,6 +1,6 @@
 import { query } from '../../utils/db'
 import { getCurrentAccount } from '../../utils/auth'
-import { ensureBusinessGoalsTable, GOAL_MONEY, GOAL_METRICS, GOAL_STATUSES } from '../../utils/businessGoals'
+import { ensureBusinessGoalsTable, GOAL_MONEY, GOAL_MONEY_PLAIN, GOAL_METRICS, GOAL_STATUSES } from '../../utils/businessGoals'
 
 export default defineEventHandler(async (e) => {
   const account = await getCurrentAccount(e)
@@ -37,7 +37,7 @@ export default defineEventHandler(async (e) => {
       `INSERT INTO business_goals
          (partnership_id, owner_id, title, metric, target_amount, current_amount, year, due_date, status, notes, created_by)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       RETURNING id, title, metric, year, due_date, status, notes, owner_id, created_at, updated_at, ${GOAL_MONEY}`,
+       RETURNING id, title, metric, year, due_date, status, notes, owner_id, created_at, updated_at, ${GOAL_MONEY_PLAIN}`,
       [account.partnership_id, ownerId, String(b.title).trim(), metric, num(b.target_amount), num(b.current_amount),
        year, b.due_date || null, status, b.notes || '', account.id]
     )

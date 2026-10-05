@@ -30,8 +30,12 @@ export function ensureBusinessGoalsTable() {
   return ready
 }
 
-// NUMERIC -> string via pg : on caste en float8 pour le client
+// NUMERIC -> string via pg : on caste en float8 pour le client.
+// GOAL_MONEY est prefixe par l'alias `g` : il ne vaut QUE dans un SELECT ... FROM business_goals g.
+// Dans un INSERT ... RETURNING l'alias n'existe pas -> erreur 500 « missing FROM-clause entry for table "g" ».
+// D'ou GOAL_MONEY_PLAIN, sans prefixe, pour les clauses RETURNING.
 export const GOAL_MONEY = `g.target_amount::float8 AS target_amount, g.current_amount::float8 AS current_amount`
+export const GOAL_MONEY_PLAIN = `target_amount::float8 AS target_amount, current_amount::float8 AS current_amount`
 
 // net_worth = progression calculée depuis le patrimoine réel de la personne
 export const GOAL_METRICS = ['net_worth', 'savings', 'income', 'custom'] as const
