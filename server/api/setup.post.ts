@@ -328,6 +328,30 @@ export default defineEventHandler(async () => {
     )
   `)
 
+  // Business dates (rendez-vous pro, partagés dans le couple)
+  await query(`
+    CREATE TABLE IF NOT EXISTS business_dates (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      created_by INT REFERENCES accounts(id),
+      title TEXT NOT NULL,
+      contact TEXT DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'meeting',
+      location TEXT DEFAULT '',
+      meeting_url TEXT DEFAULT '',
+      starts_at TIMESTAMPTZ NOT NULL,
+      ends_at TIMESTAMPTZ,
+      all_day BOOLEAN DEFAULT false,
+      status TEXT NOT NULL DEFAULT 'planned',
+      reminder_min INT DEFAULT 30,
+      notes TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await query(`ALTER TABLE business_dates ADD COLUMN IF NOT EXISTS meeting_url TEXT DEFAULT ''`)
+  await query(`ALTER TABLE business_dates ADD COLUMN IF NOT EXISTS contact TEXT DEFAULT ''`)
+
   // Trip proposals
   await query(`
     CREATE TABLE IF NOT EXISTS trip_proposals (

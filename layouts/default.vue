@@ -9,25 +9,29 @@
           <span class="hidden sm:inline text-base sm:text-lg font-bold text-text">Nous Deux</span>
         </NuxtLink>
         <div class="flex items-center gap-0.5 sm:gap-1.5 min-w-0">
-          <NuxtLink to="/todos" class="px-2 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
+          <NuxtLink to="/todos" class="px-1.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
             :class="$route.path === '/todos' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
-            <Icon icon="lucide:list-todo" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden sm:inline">Tâches</span>
+            <Icon icon="lucide:list-todo" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden lg:inline">Tâches</span>
           </NuxtLink>
-          <NuxtLink to="/calendrier" class="px-2 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
+          <NuxtLink to="/calendrier" class="px-1.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
             :class="$route.path === '/calendrier' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
-            <Icon icon="lucide:calendar-days" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden sm:inline">Calendrier</span>
+            <Icon icon="lucide:calendar-days" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden lg:inline">Calendrier</span>
           </NuxtLink>
-          <NuxtLink to="/carte" class="px-2 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
+          <NuxtLink to="/carte" class="px-1.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
             :class="$route.path === '/carte' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
-            <Icon icon="lucide:globe" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden sm:inline">Carte</span>
+            <Icon icon="lucide:globe" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden lg:inline">Carte</span>
           </NuxtLink>
-          <NuxtLink to="/moments" class="px-2 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
+          <NuxtLink to="/moments" class="px-1.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
             :class="$route.path === '/moments' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
-            <Icon icon="lucide:sparkles" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden sm:inline">Moments</span>
+            <Icon icon="lucide:sparkles" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden lg:inline">Moments</span>
           </NuxtLink>
-          <NuxtLink to="/messages" class="px-2 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
+          <NuxtLink to="/messages" class="px-1.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
             :class="$route.path === '/messages' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
-            <Icon icon="lucide:message-circle" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden sm:inline">Chat</span>
+            <Icon icon="lucide:message-circle" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden lg:inline">Chat</span>
+          </NuxtLink>
+          <NuxtLink to="/business-date" class="px-1.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 flex items-center gap-1 sm:gap-1.5"
+            :class="$route.path === '/business-date' ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text hover:bg-surface2'">
+            <Icon icon="lucide:briefcase" class="w-3.5 h-3.5 sm:w-4 sm:h-4" /> <span class="hidden lg:inline">Business</span>
           </NuxtLink>
 
           <!-- Notification bell -->
@@ -76,7 +80,7 @@
             <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-[10px] sm:text-xs font-bold text-white" :style="{ background: account.color }">
               {{ account.name.charAt(0) }}
             </div>
-            <span class="hidden sm:inline text-sm text-text">{{ account.name }} & {{ account.partner.name }}</span>
+            <span class="hidden xl:inline text-sm text-text">{{ account.name }} & {{ account.partner.name }}</span>
             <Icon icon="lucide:heart" class="w-3.5 h-3.5 text-rose hidden sm:block" />
           </div>
         </div>
