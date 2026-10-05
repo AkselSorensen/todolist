@@ -70,6 +70,35 @@ export const useApi = () => {
     return await $fetch(`/api/business-dates/${id}`, { method: 'DELETE' })
   }
 
+  // --- Business ideas (idées, quoi faire, combien d'argent) ---
+  async function fetchBusinessIdeas(stage?: string) {
+    return await $fetch(`/api/business-ideas${stage ? '?stage=' + encodeURIComponent(stage) : ''}`)
+  }
+
+  async function createBusinessIdea(data: any) {
+    return await $fetch('/api/business-ideas', { method: 'POST', body: data })
+  }
+
+  async function updateBusinessIdea(id: number, data: any) {
+    return await $fetch(`/api/business-ideas/${id}`, { method: 'PATCH', body: data })
+  }
+
+  async function deleteBusinessIdea(id: number) {
+    return await $fetch(`/api/business-ideas/${id}`, { method: 'DELETE' })
+  }
+
+  async function createBusinessIdeaTask(ideaId: number, data: any) {
+    return await $fetch(`/api/business-ideas/${ideaId}/tasks`, { method: 'POST', body: data })
+  }
+
+  async function updateBusinessIdeaTask(ideaId: number, taskId: number, data: any) {
+    return await $fetch(`/api/business-ideas/${ideaId}/tasks`, { method: 'PATCH', body: { id: taskId, ...data } })
+  }
+
+  async function deleteBusinessIdeaTask(ideaId: number, taskId: number) {
+    return await $fetch(`/api/business-ideas/${ideaId}/tasks?id=${taskId}`, { method: 'DELETE' })
+  }
+
   async function setupDb() {
     return await $fetch('/api/setup', { method: 'POST' })
   }
@@ -79,6 +108,8 @@ export const useApi = () => {
     fetchEvents, createEvent, updateEvent, deleteEvent,
     fetchUsers, fetchAnniversary, updateAnniversary,
     fetchBusinessDates, createBusinessDate, updateBusinessDate, deleteBusinessDate,
+    fetchBusinessIdeas, createBusinessIdea, updateBusinessIdea, deleteBusinessIdea,
+    createBusinessIdeaTask, updateBusinessIdeaTask, deleteBusinessIdeaTask,
     setupDb,
   }
 }

@@ -352,6 +352,37 @@ export default defineEventHandler(async () => {
   await query(`ALTER TABLE business_dates ADD COLUMN IF NOT EXISTS meeting_url TEXT DEFAULT ''`)
   await query(`ALTER TABLE business_dates ADD COLUMN IF NOT EXISTS contact TEXT DEFAULT ''`)
 
+  // Idées business (quoi faire, combien d'argent)
+  await query(`
+    CREATE TABLE IF NOT EXISTS business_ideas (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      created_by INT REFERENCES accounts(id),
+      title TEXT NOT NULL,
+      pitch TEXT DEFAULT '',
+      stage TEXT NOT NULL DEFAULT 'idea',
+      effort TEXT NOT NULL DEFAULT 'medium',
+      invested NUMERIC(12,2) DEFAULT 0,
+      monthly_target NUMERIC(12,2) DEFAULT 0,
+      earned NUMERIC(12,2) DEFAULT 0,
+      next_step TEXT DEFAULT '',
+      link TEXT DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await query(`
+    CREATE TABLE IF NOT EXISTS business_idea_tasks (
+      id SERIAL PRIMARY KEY,
+      idea_id INT REFERENCES business_ideas(id) ON DELETE CASCADE,
+      label TEXT NOT NULL,
+      done BOOLEAN DEFAULT false,
+      position INT DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await query(`CREATE INDEX IF NOT EXISTS business_idea_tasks_idea_idx ON business_idea_tasks (idea_id)`)
+
   // Trip proposals
   await query(`
     CREATE TABLE IF NOT EXISTS trip_proposals (
