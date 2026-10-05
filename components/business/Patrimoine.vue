@@ -24,6 +24,7 @@ defineExpose({ openCreate: () => assetsRef.value?.openCreate() })
 
 const mine = ref<any[]>([])
 const common = ref<any[]>([])
+const snapshots = ref<any[]>([])
 const loading = ref(true)
 
 async function load() {
@@ -39,6 +40,16 @@ async function load() {
     mine.value = []
     common.value = []
   }
+  try {
+    const snap = await api.fetchBusinessSnapshots(12)
+    // une ligne par (mois, propriétaire) -> on ne garde que la personne
+    snapshots.value = (snap?.rows || [])
+      .filter((r: any) => (r.owner_id ?? null) === props.personId)
+      .map((r: any) => ({ month: String(r.month).slice(0, 10), total: Number(r.total) || 0, assets: Number(r.assets_count) || 0 }))
+      .sort((a: any, b: any) => a.month < b.month ? -1 : 1)
+  } catch {
+    snapshots.value = []
+  }
   loading.value = false
 }
 
@@ -50,6 +61,59 @@ const eur = (n: any) => new Intl.NumberFormat('fr-FR', { style: 'currency', curr
 const total = computed(() => mine.value.reduce((s, a) => s + (Number(a.value) || 0), 0))
 const commonTotal = computed(() => common.value.reduce((s, a) => s + (Number(a.value) || 0), 0))
 const biggest = computed(() => mine.value.slice().sort((a, b) => b.value - a.value)[0] || null)
+
+/* ---- Évolution : courbe, progression, projection ---- */
+const monthLabel = (m: string) => new Date(m + 'T12:00:00').toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
+
+const chart = computed(() => {
+  const pts = snapshots.value
+  if (pts.length < 2) return null
+  const vals = pts.map(p => p.total)
+  const max = Math.max(...vals)
+  const min = Math.min(...vals)
+  const span = max - min || Math.max(1, Math.abs(max)) || 1   // tout plat -> pas de division par 0
+  const W = 600, H = 150, PAD = 10
+  const x = (i: number) => (pts.length === 1 ? 0 : (i / (pts.length - 1)) * W)
+  const y = (v: number) => H - PAD - ((v - min) / span) * (H - PAD * 2)
+  const coords = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.total).toFixed(1)}`)
+  return {
+    W, H,
+    line: coords.join(' '),
+    area: `M 0,${H} L ` + coords.join(' L ') + ` L ${W},${H} Z`,
+    first: pts[0],
+    last: pts[pts.length - 1],
+    gradientId: 'patGrad' + props.personId,
+  }
+})
+
+const evolution = computed(() => {
+  const s = snapshots.value
+  if (s.length < 2) return null
+  const first = s[0].total
+  const last = s[s.length - 1].total
+  const delta = last - first
+  const months = s.length - 1
+  // pente par moindres carrés : plus juste qu'une simple moyenne quand les mois sont irréguliers
+  const n = s.length
+  const sx = (n - 1) * n / 2
+  const sxx = (n - 1) * n * (2 * n - 1) / 6
+  const sy = s.reduce((a, p) => a + p.total, 0)
+  const sxy = s.reduce((a, p, i) => a + i * p.total, 0)
+  const denom = n * sxx - sx * sx
+  const slope = denom !== 0 ? (n * sxy - sx * sy) / denom : 0
+  return {
+    first, last, delta, months, slope,
+    pct: first > 0 ? (delta / first) * 100 : null,
+    perMonth: months > 0 ? delta / months : 0,
+  }
+})
+
+// projection seulement si la pente est positive ET qu'on a au moins 3 relevés (sinon c'est du bruit)
+const projection = computed(() => {
+  const e = evolution.value
+  if (!e || snapshots.value.length < 3 || e.slope <= 0) return null
+  return { fiveYears: Math.round(e.last + e.slope * 60), perMonth: Math.round(e.slope) }
+})
 
 const breakdown = computed(() => CATEGORIES.map(c => {
   const items = mine.value.filter(a => a.category === c.key)
@@ -112,6 +176,85 @@ const breakdown = computed(() => CATEGORIES.map(c => {
           <p class="text-[11px] text-text-muted truncate mt-1">En commun (à deux)</p>
         </div>
       </div>
+    </div>
+
+    <!-- Évolution du patrimoine -->
+    <div v-if="!loading" class="bg-surface border border-border rounded-xl p-4">
+      <div class="flex items-start justify-between gap-3 mb-3">
+        <h3 class="text-sm font-bold flex items-center gap-2">
+          <Icon icon="lucide:line-chart" class="w-4 h-4 text-rose" />
+          Évolution du patrimoine
+        </h3>
+        <span v-if="snapshots.length" class="text-[11px] text-text-muted flex-shrink-0">
+          {{ snapshots.length }} relevé{{ snapshots.length > 1 ? 's' : '' }} mensuel{{ snapshots.length > 1 ? 's' : '' }}
+        </span>
+      </div>
+
+      <!-- Un seul point : la courbe n'a pas encore de recul, on le dit au lieu de dessiner un faux plat -->
+      <div v-if="snapshots.length < 2" class="text-xs text-text-muted leading-relaxed">
+        <p class="flex items-start gap-2">
+          <Icon icon="lucide:info" class="w-3.5 h-3.5 mt-px flex-shrink-0 text-lavender" />
+          <span>
+            Le relevé du mois est enregistré automatiquement. La courbe et la projection apparaîtront
+            à partir du <b>2ᵉ mois</b> — en attendant, chaque visite remet à jour le relevé du mois en cours.
+          </span>
+        </p>
+      </div>
+
+      <template v-else>
+        <div class="flex items-baseline gap-2 flex-wrap mb-3">
+          <span class="text-2xl font-bold">{{ eur(chart.last.total) }}</span>
+          <span class="text-xs font-semibold flex items-center gap-1"
+            :class="evolution.delta >= 0 ? 'text-mint' : 'text-rose'">
+            <Icon :icon="evolution.delta >= 0 ? 'lucide:trending-up' : 'lucide:trending-down'" class="w-3.5 h-3.5" />
+            {{ evolution.delta >= 0 ? '+' : '' }}{{ eur(evolution.delta) }}
+            <span v-if="evolution.pct !== null">({{ evolution.pct >= 0 ? '+' : '' }}{{ evolution.pct.toFixed(1) }} %)</span>
+          </span>
+        </div>
+        <p class="text-[11px] text-text-muted mb-3">
+          sur {{ evolution.months }} mois · {{ monthLabel(snapshots[0].month) }} → {{ monthLabel(chart.last.month) }}
+        </p>
+
+        <!-- Courbe : SVG en ligne, sans librairie. preserveAspectRatio=none pour coller à la hauteur CSS,
+             on ne dessine pas de points ronds (ils seraient écrasés) -->
+        <svg :viewBox="`0 0 ${chart.W} ${chart.H}`" preserveAspectRatio="none" class="w-full h-28 sm:h-36">
+          <defs>
+            <linearGradient :id="chart.gradientId" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#ff6b8a" stop-opacity="0.35" />
+              <stop offset="100%" stop-color="#ff6b8a" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+          <path :d="chart.area" :fill="`url(#${chart.gradientId})`" />
+          <polyline :points="chart.line" fill="none" stroke="#ff6b8a" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />
+        </svg>
+
+        <div class="flex items-center justify-between text-[10px] text-text-muted mt-1">
+          <span>{{ monthLabel(snapshots[0].month) }} · {{ eur(evolution.first) }}</span>
+          <span>{{ monthLabel(chart.last.month) }} · {{ eur(evolution.last) }}</span>
+        </div>
+
+        <!-- Projection -->
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <div class="bg-surface2 rounded-xl p-3">
+            <p class="text-[11px] text-text-muted mb-1">Rythme moyen</p>
+            <p class="text-sm font-bold" :class="projection && projection.perMonth >= 0 ? 'text-mint' : 'text-text'">
+              {{ evolution.perMonth >= 0 ? '+' : '' }}{{ eur(evolution.perMonth) }} / mois
+            </p>
+          </div>
+          <div class="bg-surface2 rounded-xl p-3">
+            <p class="text-[11px] text-text-muted mb-1">Dans 5 ans</p>
+            <p v-if="projection" class="text-sm font-bold text-lavender">{{ eur(projection.fiveYears) }}</p>
+            <p v-else class="text-[11px] text-text-muted leading-tight">
+              {{ snapshots.length < 3 ? 'à partir de 3 relevés' : 'tendance à la baisse' }}
+            </p>
+          </div>
+        </div>
+        <p v-if="projection" class="text-[10px] text-text-muted mt-2 flex items-start gap-1.5">
+          <Icon icon="lucide:calculator" class="w-3 h-3 mt-px flex-shrink-0" />
+          Projection à partir de la tendance des {{ snapshots.length }} relevés — pas une promesse.
+        </p>
+      </template>
     </div>
 
     <!-- Répartition par type -->

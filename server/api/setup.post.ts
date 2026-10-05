@@ -424,6 +424,24 @@ export default defineEventHandler(async () => {
   `)
   await query(`CREATE INDEX IF NOT EXISTS business_goals_year_idx ON business_goals (partnership_id, year)`)
 
+  // Relevé mensuel du patrimoine (une photo par mois et par propriétaire)
+  await query(`
+    CREATE TABLE IF NOT EXISTS business_net_worth_snapshots (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      owner_id INT REFERENCES accounts(id),
+      month DATE NOT NULL,
+      total NUMERIC(14,2) NOT NULL DEFAULT 0,
+      assets_count INT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS business_net_worth_snapshots_uniq
+      ON business_net_worth_snapshots (partnership_id, COALESCE(owner_id, 0), month)
+  `)
+
   // Trip proposals
   await query(`
     CREATE TABLE IF NOT EXISTS trip_proposals (

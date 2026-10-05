@@ -142,6 +142,11 @@ export const useApi = () => {
     return await $fetch(`/api/business-goals/${id}`, { method: 'DELETE' })
   }
 
+  // --- Historique du patrimoine (relevés mensuels) ---
+  async function fetchBusinessSnapshots(months = 12) {
+    return await $fetch(`/api/business-snapshots?months=${months}`)
+  }
+
   async function setupDb() {
     return await $fetch('/api/setup', { method: 'POST' })
   }
@@ -155,6 +160,7 @@ export const useApi = () => {
     createBusinessIdeaTask, updateBusinessIdeaTask, deleteBusinessIdeaTask,
     fetchBusinessAssets, createBusinessAsset, updateBusinessAsset, deleteBusinessAsset,
     fetchBusinessGoals, createBusinessGoal, updateBusinessGoal, deleteBusinessGoal,
+    fetchBusinessSnapshots,
     setupDb,
   }
 }
