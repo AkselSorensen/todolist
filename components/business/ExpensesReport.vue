@@ -209,12 +209,18 @@ const owners = computed<any[]>(() => {
           <template v-else>Score, graphiques et conseils à partir de tes saisies</template>
         </p>
       </div>
-      <div class="bg-surface border border-border rounded-xl p-1 flex gap-1 flex-shrink-0">
-        <button v-for="p in [3, 6, 12]" :key="p" @click="period = p"
-          class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-          :class="period === p ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text'">
-          {{ p }} mois
-        </button>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <div class="bg-surface border border-border rounded-xl p-1 flex gap-1">
+          <button v-for="p in [3, 6, 12]" :key="p" @click="period = p"
+            class="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+            :class="period === p ? 'bg-surface2 text-text' : 'text-text-muted hover:text-text'">
+            {{ p }} mois
+          </button>
+        </div>
+        <NuxtLink :to="`/business-presentation?months=${period}`" target="_blank"
+          class="px-3 py-2 rounded-xl border border-border bg-surface text-text text-xs font-medium hover:border-rose/40 transition-colors flex items-center gap-1.5">
+          <Icon icon="lucide:presentation" class="w-3.5 h-3.5 text-rose" /> Présentation
+        </NuxtLink>
       </div>
     </div>
 
