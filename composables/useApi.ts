@@ -147,6 +147,41 @@ export const useApi = () => {
     return await $fetch(`/api/business-snapshots?months=${months}`)
   }
 
+  // --- Dépenses (revenus, charges, variables, voyages, épargne, investissement) ---
+  async function fetchExpenses(filters?: { month?: string; owner?: string | number; bucket?: string; category?: string }) {
+    const params = new URLSearchParams()
+    if (filters?.month) params.set('month', filters.month)
+    if (filters?.owner !== undefined && filters?.owner !== '') params.set('owner', String(filters.owner))
+    if (filters?.bucket) params.set('bucket', filters.bucket)
+    if (filters?.category) params.set('category', filters.category)
+    return await $fetch(`/api/business-expenses${params.toString() ? '?' + params : ''}`)
+  }
+
+  async function createExpense(data: any) {
+    return await $fetch('/api/business-expenses', { method: 'POST', body: data })
+  }
+
+  async function updateExpense(id: number, data: any) {
+    return await $fetch(`/api/business-expenses/${id}`, { method: 'PATCH', body: data })
+  }
+
+  async function deleteExpense(id: number) {
+    return await $fetch(`/api/business-expenses/${id}`, { method: 'DELETE' })
+  }
+
+  // Bilan : agrégats + score + conseils, calculés côté serveur
+  async function fetchExpenseReport(months = 6) {
+    return await $fetch(`/api/business-expenses/report?months=${months}`)
+  }
+
+  async function fetchExpenseBudgets() {
+    return await $fetch('/api/business-expense-budgets')
+  }
+
+  async function saveExpenseBudget(category: string, monthly_amount: number) {
+    return await $fetch('/api/business-expense-budgets', { method: 'POST', body: { category, monthly_amount } })
+  }
+
   async function setupDb() {
     return await $fetch('/api/setup', { method: 'POST' })
   }
@@ -161,6 +196,8 @@ export const useApi = () => {
     fetchBusinessAssets, createBusinessAsset, updateBusinessAsset, deleteBusinessAsset,
     fetchBusinessGoals, createBusinessGoal, updateBusinessGoal, deleteBusinessGoal,
     fetchBusinessSnapshots,
+    fetchExpenses, createExpense, updateExpense, deleteExpense,
+    fetchExpenseReport, fetchExpenseBudgets, saveExpenseBudget,
     setupDb,
   }
 }

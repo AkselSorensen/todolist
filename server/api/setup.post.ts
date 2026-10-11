@@ -27,6 +27,20 @@ export default defineEventHandler(async () => {
     )
   `)
 
+  // Comptes du couple : l'auth est câblée sur Aksel (4) et Amandine (5) dans
+  // server/middleware/auth.ts. Sans ces lignes, une base neuve répond
+  // « Account not found » sur toutes les routes privées. Idempotent.
+  await query(`INSERT INTO partnerships (id) VALUES (1) ON CONFLICT (id) DO NOTHING`)
+  await query(`
+    INSERT INTO accounts (id, email, password_hash, name, color, partner_id, partnership_id)
+    VALUES (4, 'aksel@nousdeux.fr', 'demo', 'Aksel', '#4da6ff', 5, 1),
+           (5, 'amandine@nousdeux.fr', 'demo', 'Amandine', '#ff6b8a', 4, 1)
+    ON CONFLICT (id) DO NOTHING
+  `)
+  // les id sont fournis à la main : on recale les séquences pour les prochains INSERT
+  await query(`SELECT setval(pg_get_serial_sequence('accounts', 'id'), GREATEST((SELECT COALESCE(MAX(id), 1) FROM accounts), 5))`)
+  await query(`SELECT setval(pg_get_serial_sequence('partnerships', 'id'), GREATEST((SELECT COALESCE(MAX(id), 1) FROM partnerships), 1))`)
+
   // Refresh tokens
   await query(`
     CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -97,6 +111,19 @@ export default defineEventHandler(async () => {
   await query(`ALTER TABLE calendar_events DROP CONSTRAINT IF EXISTS calendar_events_event_type_check`)
   await query(`ALTER TABLE calendar_events ADD CONSTRAINT calendar_events_event_type_check CHECK (event_type IN ('event', 'availability', 'reminder', 'date_night', 'trip'))`)
 
+  // Visited countries table — créée AVANT les migrations : un ALTER sur une table
+  // encore absente faisait échouer tout le setup sur une base neuve.
+  await query(`
+    CREATE TABLE IF NOT EXISTS visited_countries (
+      id SERIAL PRIMARY KEY,
+      country_name TEXT NOT NULL UNIQUE,
+      visited_by TEXT NOT NULL DEFAULT 'both',
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  // Add visited_by column if missing (migration)
+  await query(`ALTER TABLE visited_countries ADD COLUMN IF NOT EXISTS visited_by TEXT NOT NULL DEFAULT 'both'`)
+
   // Add partnership_id to existing tables (migration)
   await query(`ALTER TABLE visited_countries ADD COLUMN IF NOT EXISTS partnership_id INT REFERENCES partnerships(id)`)
   await query(`ALTER TABLE todos ADD COLUMN IF NOT EXISTS partnership_id INT REFERENCES partnerships(id)`)
@@ -111,18 +138,6 @@ export default defineEventHandler(async () => {
   await query(`DO $$ BEGIN ALTER TABLE todos ADD CONSTRAINT todos_created_by_fkey FOREIGN KEY (created_by) REFERENCES accounts(id); EXCEPTION WHEN duplicate_object THEN NULL; END $$`)
   await query(`DO $$ BEGIN ALTER TABLE todos ADD CONSTRAINT todos_assigned_to_fkey FOREIGN KEY (assigned_to) REFERENCES accounts(id); EXCEPTION WHEN duplicate_object THEN NULL; END $$`)
   await query(`DO $$ BEGIN ALTER TABLE calendar_events ADD CONSTRAINT calendar_events_created_by_fkey FOREIGN KEY (created_by) REFERENCES accounts(id); EXCEPTION WHEN duplicate_object THEN NULL; END $$`)
-
-  // Visited countries table
-  await query(`
-    CREATE TABLE IF NOT EXISTS visited_countries (
-      id SERIAL PRIMARY KEY,
-      country_name TEXT NOT NULL UNIQUE,
-      visited_by TEXT NOT NULL DEFAULT 'both',
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `)
-  // Add visited_by column if missing (migration)
-  await query(`ALTER TABLE visited_countries ADD COLUMN IF NOT EXISTS visited_by TEXT NOT NULL DEFAULT 'both'`)
 
   // Countries table
   await query(`
@@ -171,7 +186,8 @@ export default defineEventHandler(async () => {
       ['Fidji','Fiji',-17.7,178.1,'Océanie','🇫🇯'],
     ]
     for (const c of seedCountries) {
-      await query('INSERT INTO countries (name, en_name, lat, lng, continent, emoji, attractions) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (name) DO NOTHING', c)
+      // 6 valeurs fournies : les attractions sont remplies juste après par le mapping ci-dessous
+      await query('INSERT INTO countries (name, en_name, lat, lng, continent, emoji) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (name) DO NOTHING', c)
     }
   }
 
@@ -440,6 +456,51 @@ export default defineEventHandler(async () => {
   await query(`
     CREATE UNIQUE INDEX IF NOT EXISTS business_net_worth_snapshots_uniq
       ON business_net_worth_snapshots (partnership_id, COALESCE(owner_id, 0), month)
+  `)
+
+  // Dépenses du couple : revenus, charges, variables, voyages, épargne, investissement.
+  // `bucket` = classe de calcul déduite de la catégorie côté API ; `month` est généré
+  // par Postgres pour que le regroupement mensuel soit le même au stockage et à la lecture.
+  await query(`
+    CREATE TABLE IF NOT EXISTS business_expenses (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      owner_id INT REFERENCES accounts(id),
+      created_by INT REFERENCES accounts(id),
+      label TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'autre',
+      bucket TEXT NOT NULL DEFAULT 'variable',
+      amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+      spent_on DATE NOT NULL DEFAULT CURRENT_DATE,
+      month DATE GENERATED ALWAYS AS (date_trunc('month', spent_on::timestamp)::date) STORED,
+      payment TEXT NOT NULL DEFAULT 'cb',
+      recurring BOOLEAN NOT NULL DEFAULT false,
+      recur_day INT,
+      notes TEXT DEFAULT '',
+      source TEXT NOT NULL DEFAULT 'manual',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `)
+  await query(`CREATE INDEX IF NOT EXISTS business_expenses_partnership_month_idx ON business_expenses (partnership_id, month)`)
+  await query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS business_expenses_auto_uniq
+      ON business_expenses (partnership_id, COALESCE(owner_id, 0), label, category, month)
+      WHERE source = 'auto'
+  `)
+
+  // Plafonds mensuels par catégorie (budgets)
+  await query(`
+    CREATE TABLE IF NOT EXISTS business_expense_budgets (
+      id SERIAL PRIMARY KEY,
+      partnership_id INT REFERENCES partnerships(id),
+      category TEXT NOT NULL,
+      monthly_amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+      created_by INT REFERENCES accounts(id),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (partnership_id, category)
+    )
   `)
 
   // Trip proposals

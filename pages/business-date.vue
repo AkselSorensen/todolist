@@ -6,11 +6,12 @@ useHead({ title: 'Business — Nous Deux' })
 const route = useRoute()
 const router = useRouter()
 
-type Tab = 'agenda' | 'company' | 'investment' | 'aksel' | 'amandine' | 'goals'
+type Tab = 'agenda' | 'company' | 'investment' | 'expenses' | 'aksel' | 'amandine' | 'goals'
 const tabs = [
   { key: 'agenda' as Tab, label: 'Agenda', icon: 'lucide:calendar-clock', cta: 'Nouveau rendez-vous' },
   { key: 'company' as Tab, label: 'Entreprise', icon: 'lucide:briefcase', cta: 'Nouvelle idée' },
   { key: 'investment' as Tab, label: 'Investissement', icon: 'lucide:trending-up', cta: 'Nouvelle piste' },
+  { key: 'expenses' as Tab, label: 'Dépenses', icon: 'lucide:receipt', cta: 'Nouvelle dépense' },
   { key: 'aksel' as Tab, label: 'Aksel', icon: 'lucide:user', person: 4, color: '#4da6ff', cta: 'Ajouter un actif' },
   { key: 'amandine' as Tab, label: 'Amandine', icon: 'lucide:user', person: 5, color: '#ff6b8a', cta: 'Ajouter un actif' },
   { key: 'goals' as Tab, label: 'Objectifs', icon: 'lucide:target', cta: 'Nouvel objectif' },
@@ -24,6 +25,7 @@ const tab = ref<Tab>(known.includes(requested) ? requested : 'agenda')
 const agendaRef = ref<any>(null)
 const companyRef = ref<any>(null)
 const investmentRef = ref<any>(null)
+const expensesRef = ref<any>(null)
 const akselRef = ref<any>(null)
 const amandineRef = ref<any>(null)
 const goalsRef = ref<any>(null)
@@ -39,7 +41,7 @@ function setTabEl(key: string, el: any) {
 function selectTab(key: Tab) {
   tab.value = key
   router.replace({ query: key === 'agenda' ? {} : { tab: key } })
-  // La barre peut défiler (6 onglets en mobile) : on recentre l'onglet choisi
+  // La barre peut défiler (7 onglets en mobile) : on recentre l'onglet choisi
   nextTick(() => {
     const el = tabEls[key]
     const strip = stripRef.value
@@ -51,7 +53,7 @@ function selectTab(key: Tab) {
 // Une seule action principale, qui suit l'onglet actif
 function primaryAction() {
   const refs: Record<Tab, any> = {
-    agenda: agendaRef, company: companyRef, investment: investmentRef,
+    agenda: agendaRef, company: companyRef, investment: investmentRef, expenses: expensesRef,
     aksel: akselRef, amandine: amandineRef, goals: goalsRef,
   }
   refs[tab.value]?.value?.openCreate()
@@ -65,7 +67,7 @@ function primaryAction() {
         <Icon icon="lucide:briefcase" class="w-7 h-7 text-rose" />
         Business
       </h1>
-      <p class="text-text-muted text-sm mt-1">Rendez-vous pro, idées de boîte, placements, patrimoine et objectifs</p>
+      <p class="text-text-muted text-sm mt-1">Rendez-vous pro, idées de boîte, placements, dépenses, patrimoine et objectifs</p>
     </div>
 
     <!-- Sections Business + action principale -->
@@ -89,6 +91,7 @@ function primaryAction() {
     <BusinessAgenda v-if="tab === 'agenda'" ref="agendaRef" />
     <BusinessIdeas v-else-if="tab === 'company'" ref="companyRef" domain="company" />
     <BusinessInvestments v-else-if="tab === 'investment'" ref="investmentRef" />
+    <BusinessExpenses v-else-if="tab === 'expenses'" ref="expensesRef" />
     <BusinessPatrimoine v-else-if="tab === 'aksel'" ref="akselRef" :person-id="4" />
     <BusinessPatrimoine v-else-if="tab === 'amandine'" ref="amandineRef" :person-id="5" />
     <BusinessGoals v-else ref="goalsRef" />
